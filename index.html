@@ -67,6 +67,7 @@
             const data = new Uint8Array(analyser.frequencyBinCount);
             document.getElementById('overlay').style.display = 'none';
 
+            // --- ピークホールド管理変数 (Float32Arrayで精度を確保) ---
             const barCount = 16;
             let peaks = [new Float32Array(barCount), new Float32Array(barCount)]; 
             let peakDrops = [new Float32Array(barCount), new Float32Array(barCount)];
@@ -83,100 +84,115 @@
 
                 const isLandscape = w > h;
                 const groupW = w * 0.96;
+                const groupX = (w - groupW) / 2;
                 const partH = h * 0.32; 
                 const eqGroupY = h * 0.05; 
                 const mtGroupY = eqGroupY + partH + (h * 0.03); 
 
                 const deckColor = "rgba(0, 255, 255, 0.7)";
-                const centers = [w * 0.265, w * 0.735];
+                ctx.strokeStyle = deckColor; ctx.lineWidth = isLandscape ? 2 : 3;
+                
+                ctx.strokeRect(groupX, eqGroupY, groupW, partH);
+                ctx.strokeRect(groupX, mtGroupY, groupW, partH);
+
                 const unitW = (groupW * 0.47);
+                const centers = [w * 0.265, w * 0.735];
 
                 centers.forEach((cx, idx) => {
                     const startX = cx - unitW / 2;
-                    const labelW = isLandscape ? 25 : 30;
-                    const graphX = startX + labelW;
-                    const graphW = unitW - labelW - 5;
-                    const numCells = 30;
-                    const cellH = (partH - 4) / numCells;
-
-                    // 1. 背景・枠線の描画
                     ctx.strokeStyle = deckColor; ctx.lineWidth = 1;
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // 2. EQセクション：グリッド線とデシベル目盛りの描画
+                    const labelW = isLandscape ? 25 : 30;
+                    const graphX = startX + labelW;
+                    const graphW = unitW - labelW - 5;
+                    
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-                    const dbs = ["+10", "+5", "0", "-10", "-20", "-40"];
-                    dbs.forEach((lv, i) => {
+                    const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
+                    levels.forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / 5));
                         ctx.fillText(lv, graphX - 5, ly + 4);
                         ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    // 3. EQバーとピークの計算・描画
+                    for(let i=0; i<=barCount; i++) {
+                        let lx = graphX + (i * (graphW / barCount));
+                        ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
+                    }
+
+                    const numCells = 30;
+                    const cellH = (partH - 4) / numCells;
+
                     for (let i = 0; i < barCount; i++) {
-                        let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
-                        let active = (val / 255) * numCells;
-                        
-                        // 滑らかな落下ロジック
-                        if (active >= peaks[idx][i]) {
-                            peaks[idx][i] = active;
+                        // idxに応じて参照するデータ位置を調整（左右の差別化）
+                        let val = data[i + (idx === 0 ? 2 : 5)] || 0;
+                        let activeRaw = (val / 255) * numCells;
+                        let active = Math.floor(activeRaw);
+
+                        // --- ピークホールド・ロジック ---
+                        if (activeRaw >= peaks[idx][i]) {
+                            peaks[idx][i] = activeRaw;
                             peakDrops[idx][i] = 0;
-                            peakHoldCounters[idx][i] = 30; 
+                            peakHoldCounters[idx][i] = 35; // 保持フレーム
                         } else {
                             if (peakHoldCounters[idx][i] > 0) {
                                 peakHoldCounters[idx][i]--;
                             } else {
-                                peakDrops[idx][i] += 0.02; // 重力加速度（小さいほど滑らか）
+                                peakDrops[idx][i] += 0.05; // 落下速度（加速度）
                                 peaks[idx][i] -= peakDrops[idx][i];
                             }
                         }
                         if (peaks[idx][i] < 0) peaks[idx][i] = 0;
 
-                        let bx = graphX + i * (graphW/barCount) + 1;
-                        let bw = (graphW/barCount)-2;
+                        const bx = graphX + i * (graphW/barCount) + 1;
+                        const bw = (graphW/barCount)-2;
 
-                        // カラーバー描画
-                        for (let j = 0; j < Math.floor(active); j++) {
-                            if (j < 6) ctx.fillStyle = "#00ff00";      
-                            else if (j < 15) ctx.fillStyle = "#ffff00"; 
-                            else if (j < 24) ctx.fillStyle = "#ff8800"; 
-                            else ctx.fillStyle = "#ff0000";             
+                        // 通常のカラーセル描画
+                        for (let j = 0; j < active; j++) {
+                            if (j < 4) ctx.fillStyle = "#00ff00";
+                            else if (j < 8) ctx.fillStyle = "#ffff00";
+                            else if (j < 12) ctx.fillStyle = "#ff8800";
+                            else ctx.fillStyle = "#ff0000";
+                            
                             let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
                             ctx.fillRect(bx, by, bw, cellH-1.0);
                         }
 
-                        // ピークバー（白）描画：端数を維持して滑らかに
+                        // --- ピークバー（白色）描画：浮動小数点で滑らかに配置 ---
                         if (peaks[idx][i] > 0.1) {
                             ctx.fillStyle = "#ffffff";
-                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1;
-                            ctx.fillRect(bx, pby, bw, 2); 
+                            // Math.floorを使わずそのまま位置計算することで滑らかに
+                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.0;
+                            ctx.fillRect(bx, pby, bw, 1.5); 
                         }
                     }
 
-                    // 4. アナログメーターセクション：文字・目盛りの復元
-                    const mLineY1 = mtGroupY + partH * 0.35;
-                    const mLineY2 = mtGroupY + partH * 0.65;
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
-                    ctx.beginPath(); ctx.moveTo(startX + 10, mLineY1); ctx.lineTo(startX + unitW - 10, mLineY1); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(startX + 10, mLineY2); ctx.lineTo(startX + unitW - 10, mLineY2); ctx.stroke();
+                    const upY = mtGroupY + (partH * 0.3);
+                    const loY = mtGroupY + (partH * 0.55);
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
+                    ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
 
-                    ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
-                    ctx.font = isLandscape ? "9px Arial" : "10px Arial";
-                    const watts = ["1.2", "12", "120", "1.2k"];
-                    watts.forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, mLineY1 - 6));
-                    const dbTicks = ["-40", "-20", "-10", "-5", "0", "+10"];
-                    dbTicks.forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/5, mLineY2 + 13));
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center";
+                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
 
-                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
+                    ctx.textAlign = "right"; 
                     ctx.font = "bold 10px Arial";
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.96);
+                    ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
 
-                    // 5. 針の描画
+                    ctx.textAlign = "center";
+                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
+                    ctx.fillStyle = "#0ff";
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
+                    ctx.font = `bold ${isLandscape ? 10 : 12}px Arial`;
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);
+
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -190,10 +206,11 @@
                     ctx.stroke(); ctx.restore();
                 });
 
-                // 6. ロゴ部分
                 const logoY = mtGroupY + partH + (h * 0.08);
                 ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
+                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 11 : 13}px Arial`; 
+                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 16 : 20));
                 ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
                 ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
             }

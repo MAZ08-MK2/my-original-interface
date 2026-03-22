@@ -99,28 +99,29 @@
                     const numCells = 30;
                     const cellH = (partH - 4) / numCells;
 
-                    // --- 背景枠 ---
+                    // 1. 背景・枠線の描画
                     ctx.strokeStyle = deckColor; ctx.lineWidth = 1;
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // --- EQセクション：目盛りと線の復元 ---
+                    // 2. EQセクション：グリッド線とデシベル目盛りの描画
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-                    ["+10", "+5", "0", "-10", "-20", "-40"].forEach((lv, i) => {
+                    const dbs = ["+10", "+5", "0", "-10", "-20", "-40"];
+                    dbs.forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / 5));
                         ctx.fillText(lv, graphX - 5, ly + 4);
                         ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    // --- バー描画ロジック ---
+                    // 3. EQバーとピークの計算・描画
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
                         let active = (val / 255) * numCells;
                         
-                        // ピークホールド計算（滑らかさ重視）
+                        // 滑らかな落下ロジック
                         if (active >= peaks[idx][i]) {
                             peaks[idx][i] = active;
                             peakDrops[idx][i] = 0;
@@ -129,7 +130,7 @@
                             if (peakHoldCounters[idx][i] > 0) {
                                 peakHoldCounters[idx][i]--;
                             } else {
-                                peakDrops[idx][i] += 0.03; // 加速度を抑えて滑らかに
+                                peakDrops[idx][i] += 0.02; // 重力加速度（小さいほど滑らか）
                                 peaks[idx][i] -= peakDrops[idx][i];
                             }
                         }
@@ -138,7 +139,7 @@
                         let bx = graphX + i * (graphW/barCount) + 1;
                         let bw = (graphW/barCount)-2;
 
-                        // 通常セル（積み上げ）
+                        // カラーバー描画
                         for (let j = 0; j < Math.floor(active); j++) {
                             if (j < 6) ctx.fillStyle = "#00ff00";      
                             else if (j < 15) ctx.fillStyle = "#ffff00"; 
@@ -148,32 +149,34 @@
                             ctx.fillRect(bx, by, bw, cellH-1.0);
                         }
 
-                        // ピークバー（白色：最前面に描画）
+                        // ピークバー（白）描画：端数を維持して滑らかに
                         if (peaks[idx][i] > 0.1) {
                             ctx.fillStyle = "#ffffff";
-                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.5;
-                            ctx.fillRect(bx, pby, bw, 2); // 厚みを少し持たせて視認性確保
+                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1;
+                            ctx.fillRect(bx, pby, bw, 2); 
                         }
                     }
 
-                    // --- メーターセクション：文字と線の復元 ---
-                    const meterLineY1 = mtGroupY + partH * 0.3;
-                    const meterLineY2 = mtGroupY + partH * 0.6;
+                    // 4. アナログメーターセクション：文字・目盛りの復元
+                    const mLineY1 = mtGroupY + partH * 0.35;
+                    const mLineY2 = mtGroupY + partH * 0.65;
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
-                    ctx.beginPath(); ctx.moveTo(startX + 5, meterLineY1); ctx.lineTo(startX + unitW - 5, meterLineY1); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(startX + 5, meterLineY2); ctx.lineTo(startX + unitW - 5, meterLineY2); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX + 10, mLineY1); ctx.lineTo(startX + unitW - 10, mLineY1); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX + 10, mLineY2); ctx.lineTo(startX + unitW - 10, mLineY2); ctx.stroke();
 
                     ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
                     ctx.font = isLandscape ? "9px Arial" : "10px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 20 + k * (unitW-40)/3, meterLineY1 - 5));
-                    ["-40", "-20", "-10", "-5", "0", "+10"].forEach((t, k) => ctx.fillText(t, startX + 20 + k * (unitW-40)/5, meterLineY2 + 12));
+                    const watts = ["1.2", "12", "120", "1.2k"];
+                    watts.forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, mLineY1 - 6));
+                    const dbTicks = ["-40", "-20", "-10", "-5", "0", "+10"];
+                    dbTicks.forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/5, mLineY2 + 13));
 
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.82); 
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
                     ctx.font = "bold 10px Arial";
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.94);
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.96);
 
-                    // --- 針の描画 ---
+                    // 5. 針の描画
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -187,7 +190,7 @@
                     ctx.stroke(); ctx.restore();
                 });
 
-                // --- ロゴ・クレジット ---
+                // 6. ロゴ部分
                 const logoY = mtGroupY + partH + (h * 0.08);
                 ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);

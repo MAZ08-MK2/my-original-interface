@@ -67,10 +67,11 @@
             const data = new Uint8Array(analyser.frequencyBinCount);
             document.getElementById('overlay').style.display = 'none';
 
-            // --- ピークホールド用変数 ---
             const barCount = 16;
-            let peaks = [new Float32Array(barCount), new Float32Array(barCount)]; // 左右分
+            // ピークホールド管理用
+            let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
             let peakDrops = [new Float32Array(barCount), new Float32Array(barCount)];
+            let peakHold = [new Int32Array(barCount), new Int32Array(barCount)];
 
             let angleSmooth = [0, 0];
             let mtSmooth = [0, 0];
@@ -106,7 +107,7 @@
                     const graphX = startX + labelW;
                     const graphW = unitW - labelW - 5;
                     
-                    // 目盛り描画
+                    // 背景目盛り
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
@@ -118,52 +119,53 @@
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    // 縦ライン描画
-                    for(let i=0; i<=barCount; i++) {
-                        let lx = graphX + (i * (graphW / barCount));
-                        ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
-                    }
-
-                    // --- グライコ描画 ---
                     const numCells = 30;
                     const cellH = (partH - 4) / numCells;
                     
                     for (let i = 0; i < barCount; i++) {
-                        let val = data[i + (idx === 0 ? 2 : 5)] || 0; // 左右で少し参照位置をずらす
-                        let active = Math.floor((val / 255) * numCells);
+                        let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
+                        let active = (val / 255) * numCells;
                         
-                        // ピーク更新ロジック
+                        // --- 改良版ピークホールドロジック ---
                         if (active >= peaks[idx][i]) {
                             peaks[idx][i] = active;
                             peakDrops[idx][i] = 0;
+                            peakHold[idx][i] = 30; // 30フレーム(約0.5秒)保持
                         } else {
-                            peakDrops[idx][i] += 0.15; // 落ちる速度
-                            peaks[idx][i] -= peakDrops[idx][i];
+                            if (peakHold[idx][i] > 0) {
+                                peakHold[idx][i]--;
+                            } else {
+                                peakDrops[idx][i] += 0.05; // 落下加速度
+                                peaks[idx][i] -= peakDrops[idx][i];
+                            }
                         }
                         if (peaks[idx][i] < 0) peaks[idx][i] = 0;
 
-                        // セル描画（4段ずつ色分け）
-                        for (let j = 0; j < active; j++) {
+                        let bx = graphX + i * (graphW/barCount) + 1;
+                        let bWidth = (graphW/barCount) - 2;
+
+                        // 通常バー描画
+                        let activeInt = Math.floor(active);
+                        for (let j = 0; j < activeInt; j++) {
                             if (j < 4) ctx.fillStyle = "#00ff00";      
                             else if (j < 8) ctx.fillStyle = "#ffff00"; 
                             else if (j < 12) ctx.fillStyle = "#ff8800"; 
                             else ctx.fillStyle = "#ff0000";             
                             
-                            let bx = graphX + i * (graphW/barCount) + 1;
                             let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
-                            ctx.fillRect(bx, by, (graphW/barCount)-2, cellH-1.0);
+                            ctx.fillRect(bx, by, bWidth, cellH - 1.0);
                         }
 
-                        // --- ピークバー（白色）の描画 ---
+                        // 白色ピークバー描画
                         if (peaks[idx][i] > 0) {
                             ctx.fillStyle = "#ffffff";
-                            let pbx = graphX + i * (graphW/barCount) + 1;
                             let pby = eqGroupY + partH - (Math.floor(peaks[idx][i]) + 1) * cellH - 0.5;
-                            ctx.fillRect(pbx, pby, (graphW/barCount)-2, cellH-1.0);
+                            // 既存のバーより上に描画されるように
+                            ctx.fillRect(bx, pby, bWidth, cellH - 1.0);
                         }
                     }
 
-                    // --- 下段メーター部 ---
+                    // 下段メーター
                     const upY = mtGroupY + (partH * 0.3);
                     const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
@@ -175,16 +177,10 @@
                     ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
                     ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
 
-                    ctx.textAlign = "right"; 
-                    ctx.font = "bold 10px Arial";
-                    ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
-
                     ctx.textAlign = "center";
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
                     ctx.fillStyle = "#0ff";
                     ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
-                    ctx.font = `bold ${isLandscape ? 10 : 12}px Arial`;
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);
 
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;

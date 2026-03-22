@@ -76,21 +76,21 @@
                 const w = canvas.width, h = canvas.height;
                 ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
 
-                // --- レイアウト設計 ---
-                const groupW = w * 0.96; // 枠を横に広げた
+                // --- レイアウト数値設定 ---
+                const groupW = w * 0.94; // 枠を横に広げた
                 const groupX = (w - groupW) / 2;
-                const partH = h * 0.22;  // 上下の高さを統一
-                const eqGroupY = 45;     // 上の数字が見える位置
-                const mtGroupY = eqGroupY + partH + 12; 
-                const deckColor = "rgba(0, 255, 255, 0.75)";
+                const partH = h * 0.20; 
+                const eqGroupY = 55;    // 少し下げて上の数字を見えやすく
+                const mtGroupY = eqGroupY + partH + 18;
+                const deckColor = "rgba(0, 255, 255, 0.85)";
 
-                // 1. メイン太枠（上下同じサイズ）
-                ctx.strokeStyle = deckColor; ctx.lineWidth = 5;
+                // 外枠（太線）
+                ctx.strokeStyle = deckColor; ctx.lineWidth = 4;
                 ctx.strokeRect(groupX, eqGroupY, groupW, partH);
                 ctx.strokeRect(groupX, mtGroupY, groupW, partH);
 
-                const unitW = (groupW * 0.475);
-                const centers = [w * 0.265, w * 0.735];
+                const unitW = (groupW * 0.48);
+                const centers = [w * 0.26, w * 0.74];
 
                 centers.forEach((cx, idx) => {
                     const startX = cx - unitW / 2;
@@ -98,21 +98,23 @@
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // --- 2. グライコ（復活：縦線・数字） ---
+                    // --- 1. グライコ（復活：縦線・数字） ---
                     const numCells = 24, cellH = partH / numCells;
                     const labels = ["-40", "-20", "-10", "0", "+5", "+10"];
                     const eqLIdxs = [3, 6, 10, 14, 18, 22];
 
-                    ctx.font = "bold 10px Arial"; ctx.textAlign = "left";
+                    ctx.font = "bold 11px Arial"; ctx.textAlign = "left";
                     eqLIdxs.forEach((lIdx, k) => {
                         let ly = eqGroupY + (partH - (lIdx * cellH));
+                        // 縦線（グリッド線）
                         ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
                         ctx.beginPath(); ctx.moveTo(startX, ly); ctx.lineTo(startX + unitW, ly); ctx.stroke();
-                        ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-                        ctx.fillText(labels[k], startX + 6, ly - 4);
+                        // 数字
+                        ctx.fillStyle = "cyan";
+                        ctx.fillText(labels[k], startX + 6, ly - 3);
                     });
 
-                    // スペアナバー描画
+                    // スペアナバー
                     for (let i = 0; i < 16; i++) {
                         let val = data[i+2] || 0;
                         let active = Math.floor((val / 255) * numCells * 0.85);
@@ -129,20 +131,20 @@
                         }
                     }
 
-                    // --- 3. アナログメーター（復活：DECIBELS表示） ---
-                    const upY = mtGroupY + (partH * 0.42), loY = mtGroupY + (partH * 0.58);
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.5)"; ctx.lineWidth = 1.5;
+                    // --- 2. メーター（復活：DECIBELS・数字） ---
+                    const upY = mtGroupY + (partH * 0.4), loY = mtGroupY + (partH * 0.55);
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.5)";
                     ctx.beginPath(); ctx.moveTo(startX, upY); ctx.lineTo(startX + unitW, upY); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(startX, loY); ctx.lineTo(startX + unitW, loY); ctx.stroke();
 
-                    // 数字表示
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; ctx.font = "11px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 20 + k * (unitW-40)/3, upY - 10));
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 22 + k * (unitW-44)/5, loY + 16));
+                    // WATTS / DECIBEL 数字
+                    ctx.fillStyle = "cyan"; ctx.textAlign = "center"; ctx.font = "11px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 8));
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 16));
 
-                    // ラベル（WATTS / DECIBELS）
+                    // WATTS / DECIBELS 文字ラベル
                     ctx.font = "bold 12px Arial";
-                    ctx.fillText("WATTS", cx + (unitW * 0.28), mtGroupY + 22);
+                    ctx.fillText("WATTS", cx + (unitW * 0.3), mtGroupY + 20);
                     ctx.textAlign = "right";
                     ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
 
@@ -159,14 +161,14 @@
                     ctx.lineTo(cx + Math.sin(angleSmooth[idx])*480, pivotY - Math.cos(angleSmooth[idx])*480);
                     ctx.stroke(); ctx.restore();
 
-                    // 枠内テキスト（LEFT/RIGHT）
+                    // 下部の文字（POWER OUTPUTとの重なりを解消）
                     ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
-                    ctx.font = "bold 16px Arial"; ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH - 34); 
-                    ctx.font = "bold 12px Arial"; ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH - 14);
+                    ctx.font = "bold 15px Arial"; ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH - 38); 
+                    ctx.font = "bold 11px Arial"; ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH - 22);
                 });
 
-                // --- 4. ロゴ（最下部に固定） ---
-                const logoBaseY = mtGroupY + partH + 50;
+                // --- 3. ロゴ（位置調整） ---
+                const logoBaseY = mtGroupY + partH + 48;
                 ctx.fillStyle = "#00ff00"; ctx.font = "bold 40px 'Times New Roman'"; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoBaseY);
                 ctx.fillStyle = "#fff"; ctx.font = "14px Arial"; 

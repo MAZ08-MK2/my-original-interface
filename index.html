@@ -63,12 +63,14 @@
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.3; // ピーク検知のために少し反応を鋭く
+            analyser.smoothingTimeConstant = 0.7; // 全体的な応答をさらにマイルドに
             source.connect(analyser);
             const data = new Uint8Array(analyser.frequencyBinCount);
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
+            // バーの平滑化用
+            let barSmooth = [new Float32Array(barCount), new Float32Array(barCount)];
             // 上昇ピーク用
             let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
             let alphas = [new Float32Array(barCount), new Float32Array(barCount)];
@@ -107,43 +109,38 @@
                     const graphX = startX + labelW;
                     const graphW = unitW - labelW - 5;
                     
-                    // 背景
-                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
-                    ctx.textAlign = "right";
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-                    const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
-                    levels.forEach((lv, i) => {
-                        let ly = eqGroupY + (partH * (i / 5));
-                        ctx.fillText(lv, graphX - 5, ly + 4);
-                        ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
-                        ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
-                    });
-
                     const numCells = 30;
                     const cellH = (partH - 4) / numCells;
                     const bw = (graphW / barCount) - 2;
 
                     for (let i = 0; i < barCount; i++) {
+                        // 生の音量を取得し、少し感度を調整
                         let rawVal = data[i + (idx === 0 ? 2 : 6)] || 0;
+                        
+                        // 低音量時のチラつきを抑えるための足切り
+                        if (rawVal < 40) rawVal = 0; 
+                        
                         let targetVal = (rawVal / 255) * numCells;
                         
-                        // --- 上昇ピーク（Floating Peak）ロジック ---
-                        if (targetVal >= peaks[idx][i]) {
-                            peaks[idx][i] = targetVal;
-                            alphas[idx][i] = 1.0; // 新しいピークなら不透明にリセット
-                        } else {
-                            // 徐々に上に昇る
-                            peaks[idx][i] += 0.15; 
-                            // 徐々に消える
-                            alphas[idx][i] -= 0.025; 
-                        }
+                        // --- バー本体の平滑化 (ここが滑らかさの肝) ---
+                        // 0.15が小さいほど「ゆっくり」動く
+                        barSmooth[idx][i] += (targetVal - barSmooth[idx][i]) * 0.15;
+                        let smoothVal = barSmooth[idx][i];
 
+                        // --- 上昇ピークロジック ---
+                        if (smoothVal > peaks[idx][i]) {
+                            peaks[idx][i] = smoothVal;
+                            alphas[idx][i] = 1.0;
+                        } else {
+                            peaks[idx][i] += 0.12; // 上昇速度
+                            alphas[idx][i] -= 0.03; // 消滅速度
+                        }
                         if (alphas[idx][i] < 0) alphas[idx][i] = 0;
 
                         let bx = graphX + i * (graphW / barCount) + 1;
                         
-                        // EQバー本体の描画
-                        let activeInt = Math.floor(targetVal);
+                        // EQバーの描画
+                        let activeInt = Math.floor(smoothVal);
                         for (let j = 0; j < activeInt; j++) {
                             if (j < 4) ctx.fillStyle = "#00ff00";
                             else if (j < 8) ctx.fillStyle = "#ffff00";
@@ -153,18 +150,17 @@
                             ctx.fillRect(bx, by, bw, cellH - 1.0);
                         }
 
-                        // 上昇ライン（白色）の描画
-                        if (alphas[idx][i] > 0) {
+                        // ピークライン描画（上昇消滅）
+                        if (alphas[idx][i] > 0 && peaks[idx][i] > smoothVal) {
                             ctx.fillStyle = `rgba(255, 255, 255, ${alphas[idx][i]})`;
                             let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.0;
-                            // グラフの上枠を超えないように制限
                             if (pby > eqGroupY) {
                                 ctx.fillRect(bx, pby, bw, 2.0);
                             }
                         }
                     }
 
-                    // メーター部（変更なし）
+                    // メーター部
                     const upY = mtGroupY + (partH * 0.3);
                     const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
@@ -178,6 +174,7 @@
 
                     ctx.textAlign = "right"; ctx.font = "bold 10px Arial";
                     ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
+
                     ctx.textAlign = "center";
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
                     ctx.fillStyle = "#0ff";
@@ -186,9 +183,9 @@
                     ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);
 
                     let vMt = (data[idx===0?4:10] || 0);
-                    mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
+                    mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.08; // メーターも少し重めに
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
-                    angleSmooth[idx] += (ang - angleSmooth[idx]) * 0.15;
+                    angleSmooth[idx] += (ang - angleSmooth[idx]) * 0.1;
                     ctx.save();
                     ctx.beginPath(); ctx.rect(startX, mtGroupY, unitW, partH); ctx.clip();
                     ctx.strokeStyle = "red"; ctx.lineWidth = 2.5;

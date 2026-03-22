@@ -69,9 +69,7 @@
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
-            // ピーク制御用
             let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
-            let peakWait = [new Int32Array(barCount), new Int32Array(barCount)]; // 頂点で待機するカウント
 
             let angleSmooth = [0, 0];
             let mtSmooth = [0, 0];
@@ -107,7 +105,6 @@
                     const graphX = startX + labelW;
                     const graphW = unitW - labelW - 5;
                     
-                    // 背景グリッド描画
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
@@ -127,19 +124,10 @@
                         let rawVal = data[i + (idx === 0 ? 2 : 6)] || 0;
                         let targetVal = (rawVal / 255) * numCells;
                         
-                        // --- 違和感のないディレイ・ピークホールド ---
-                        if (targetVal >= peaks[idx][i]) {
-                            peaks[idx][i] = targetVal;
-                            peakWait[idx][i] = 15; // 頂点に達したら15フレーム（約0.25秒）待機
-                        } else {
-                            if (peakWait[idx][i] > 0) {
-                                peakWait[idx][i]--; // 待機中
-                            } else {
-                                peaks[idx][i] -= 0.4; // 待機が終わったらスッと一定速度で降りる
-                            }
-                        }
-
-                        if (peaks[idx][i] < 0) peaks[idx][i] = 0;
+                        // --- 常にカラーバーの先端に引っ付いて同時に落ちるロジック ---
+                        // 1. 上昇時：もちろん引っ付く
+                        // 2. 落下時：物理演算を使わず、現在のtargetValに直接追従させる
+                        peaks[idx][i] = targetVal; 
 
                         let bx = graphX + i * (graphW / barCount) + 1;
                         
@@ -154,10 +142,11 @@
                             ctx.fillRect(bx, by, bw, cellH - 1.0);
                         }
 
-                        // ピークライン描画
-                        if (peaks[idx][i] > targetVal + 0.1) {
+                        // ピークライン描画（常にカラーバーの最上部に描画）
+                        if (peaks[idx][i] > 0.5) {
                             ctx.fillStyle = "#ffffff";
-                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.0;
+                            // Math.floorでバーの区切りに合わせることで、一体感を強調
+                            let pby = eqGroupY + partH - (Math.floor(peaks[idx][i]) * cellH) - 1.0;
                             ctx.fillRect(bx, pby, bw, 2.0);
                         }
                     }

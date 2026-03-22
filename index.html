@@ -119,25 +119,23 @@
                         ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
                     }
 
-                    // --- グライコのバー：色段の修正と高さの微調整 ---
-                    const numCells = 15;
-                    // cellHを少し小さくし、隙間(1.8)を広めに設定して1段を低く見せる
+                    // --- 【修正】グライコの段数を30（倍）にして高さを半分に ---
+                    const numCells = 30;
                     const cellH = (partH - 4) / numCells;
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i+2] || 0;
                         let active = Math.floor((val / 255) * numCells);
                         for (let j = 0; j < numCells; j++) {
                             if (j < active) {
-                                // 配色指定：緑(3) -> 黄(3) -> 橙(3) -> 残り赤
-                                if (j < 3) ctx.fillStyle = "#00ff00";      
-                                else if (j < 6) ctx.fillStyle = "#ffff00"; 
-                                else if (j < 9) ctx.fillStyle = "#ff8800";
+                                // 段数が倍になったので色分けの境界も倍に (6, 12, 18...)
+                                if (j < 6) ctx.fillStyle = "#00ff00";      
+                                else if (j < 12) ctx.fillStyle = "#ffff00"; 
+                                else if (j < 18) ctx.fillStyle = "#ff8800";
                                 else ctx.fillStyle = "#ff0000";            
                                 
                                 let bx = graphX + i * (graphW/barCount) + 1;
-                                let by = eqGroupY + partH - (j + 1) * cellH - 1;
-                                // 第4引数の高さを少し削って「低く」見せています
-                                ctx.fillRect(bx, by, (graphW/barCount)-2, cellH-1.8);
+                                let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
+                                ctx.fillRect(bx, by, (graphW/barCount)-2, cellH-1.0);
                             }
                         }
                     }
@@ -154,13 +152,15 @@
                     ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
                     ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
 
-                    // --- 【修正】DECIBELS表示：右下へ配置 ---
+                    // --- 【修正】DECIBELS表示：確実に「右下」へ配置 ---
                     ctx.textAlign = "right"; 
-                    ctx.font = "bold 9px Arial";
-                    ctx.fillText("DECIBELS", startX + unitW - 12, mtGroupY + (partH * 0.68));
+                    ctx.font = "bold 10px Arial";
+                    // 枠の右端(startX + unitW)から少し内側、かつパワー表示より上の位置
+                    ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
 
                     ctx.textAlign = "center";
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
+                    ctx.fillStyle = "#0ff";
                     ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
                     ctx.font = `bold ${isLandscape ? 10 : 12}px Arial`;
                     ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);

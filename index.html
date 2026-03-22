@@ -68,8 +68,8 @@
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
-            // --- 改良版ピークホールド管理変数 ---
-            let peaks = [new Float32Array(barCount), new Float32Array(barCount)]; 
+            // ピーク保持用の配列を初期化
+            let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
             let peakDrops = [new Float32Array(barCount), new Float32Array(barCount)];
             let peakHoldCounters = [new Int32Array(barCount), new Int32Array(barCount)];
 
@@ -105,31 +105,29 @@
                     const numCells = 30;
                     const cellH = (partH - 4) / numCells;
 
-                    // 目盛り描画
+                    // 目盛り描画省略せず実行
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
                     ["+10", "+5", "0", "-10", "-20", "-40"].forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / 5));
                         ctx.fillText(lv, graphX - 5, ly + 4);
-                        ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
-                        ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
                         let active = (val / 255) * numCells;
                         
-                        // --- ピークホールド・ロジック ---
+                        // --- 物理シミュレーションベースのピークホールド ---
                         if (active >= peaks[idx][i]) {
                             peaks[idx][i] = active;
                             peakDrops[idx][i] = 0;
-                            peakHoldCounters[idx][i] = 35; // 保持フレーム数
+                            peakHoldCounters[idx][i] = 45; // 保持フレーム（約0.7秒）
                         } else {
                             if (peakHoldCounters[idx][i] > 0) {
                                 peakHoldCounters[idx][i]--;
                             } else {
-                                peakDrops[idx][i] += 0.06; // 落下速度（加速度）
+                                peakDrops[idx][i] += 0.012; // 落下加速度（小さいほどゆっくり）
                                 peaks[idx][i] -= peakDrops[idx][i];
                             }
                         }
@@ -138,26 +136,26 @@
                         let bx = graphX + i * (graphW/barCount) + 1;
                         let bw = (graphW/barCount)-2;
 
-                        // 通常セル描画
+                        // カラーバー描画
                         for (let j = 0; j < Math.floor(active); j++) {
-                            if (j < 4) ctx.fillStyle = "#00ff00";      
-                            else if (j < 8) ctx.fillStyle = "#ffff00"; 
-                            else if (j < 12) ctx.fillStyle = "#ff8800"; 
-                            else ctx.fillStyle = "#ff0000";             
-                            
+                            if (j < 5) ctx.fillStyle = "#00ff00";
+                            else if (j < 12) ctx.fillStyle = "#ffff00";
+                            else if (j < 20) ctx.fillStyle = "#ff8800";
+                            else ctx.fillStyle = "#ff0000";
                             let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
                             ctx.fillRect(bx, by, bw, cellH-1.0);
                         }
 
-                        // --- ピークバー（白色）描画 ---
+                        // --- 白いバー（ピークライン）の描画 ---
+                        // activeよりわずかに上、またはactiveと同じ位置でも「線」として描画
                         if (peaks[idx][i] > 0.1) {
                             ctx.fillStyle = "#ffffff";
-                            let pby = eqGroupY + partH - (Math.floor(peaks[idx][i]) + 1) * cellH - 0.5;
-                            ctx.fillRect(bx, pby, bw, cellH-1.0);
+                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1;
+                            ctx.fillRect(bx, pby, bw, 2); // 2pxの厚みで視認性向上
                         }
                     }
 
-                    // 下段アナログメーター
+                    // メーター針の描画
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -169,10 +167,6 @@
                     ctx.beginPath(); ctx.moveTo(cx, pivotY);
                     ctx.lineTo(cx + Math.sin(angleSmooth[idx])*h, pivotY - Math.cos(angleSmooth[idx])*h);
                     ctx.stroke(); ctx.restore();
-                    
-                    ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
-                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
                 });
 
                 // ロゴ等

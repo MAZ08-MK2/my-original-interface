@@ -83,7 +83,6 @@
 
                 const isLandscape = w > h;
                 const groupW = w * 0.96;
-                const groupX = (w - groupW) / 2;
                 const partH = h * 0.32; 
                 const eqGroupY = h * 0.05; 
                 const mtGroupY = eqGroupY + partH + (h * 0.03); 
@@ -94,49 +93,43 @@
 
                 centers.forEach((cx, idx) => {
                     const startX = cx - unitW / 2;
-                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1;
-                    ctx.strokeRect(startX, eqGroupY, unitW, partH);
-                    ctx.strokeRect(startX, mtGroupY, unitW, partH);
-
                     const labelW = isLandscape ? 25 : 30;
                     const graphX = startX + labelW;
                     const graphW = unitW - labelW - 5;
                     const numCells = 30;
                     const cellH = (partH - 4) / numCells;
 
-                    // --- 1. 目盛り・グリッドラインの描画 ---
+                    // --- 背景枠 ---
+                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1;
+                    ctx.strokeRect(startX, eqGroupY, unitW, partH);
+                    ctx.strokeRect(startX, mtGroupY, unitW, partH);
+
+                    // --- EQセクション：目盛りと線の復元 ---
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-                    const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
-                    levels.forEach((lv, i) => {
+                    ["+10", "+5", "0", "-10", "-20", "-40"].forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / 5));
                         ctx.fillText(lv, graphX - 5, ly + 4);
                         ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    // 縦ライン描画
-                    for(let i=0; i<=barCount; i++) {
-                        let lx = graphX + (i * (graphW / barCount));
-                        ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
-                    }
-
-                    // --- 2. カラーバー & ピークホールドの計算 ---
+                    // --- バー描画ロジック ---
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
                         let active = (val / 255) * numCells;
                         
-                        // 落下ロジック（浮動小数点で計算）
+                        // ピークホールド計算（滑らかさ重視）
                         if (active >= peaks[idx][i]) {
                             peaks[idx][i] = active;
                             peakDrops[idx][i] = 0;
-                            peakHoldCounters[idx][i] = 40; 
+                            peakHoldCounters[idx][i] = 30; 
                         } else {
                             if (peakHoldCounters[idx][i] > 0) {
                                 peakHoldCounters[idx][i]--;
                             } else {
-                                peakDrops[idx][i] += 0.015; // 落下加速度（小さいほど滑らか）
+                                peakDrops[idx][i] += 0.03; // 加速度を抑えて滑らかに
                                 peaks[idx][i] -= peakDrops[idx][i];
                             }
                         }
@@ -145,50 +138,42 @@
                         let bx = graphX + i * (graphW/barCount) + 1;
                         let bw = (graphW/barCount)-2;
 
-                        // 通常セル描画
+                        // 通常セル（積み上げ）
                         for (let j = 0; j < Math.floor(active); j++) {
-                            if (j < 5) ctx.fillStyle = "#00ff00";      
-                            else if (j < 12) ctx.fillStyle = "#ffff00"; 
-                            else if (j < 20) ctx.fillStyle = "#ff8800"; 
+                            if (j < 6) ctx.fillStyle = "#00ff00";      
+                            else if (j < 15) ctx.fillStyle = "#ffff00"; 
+                            else if (j < 24) ctx.fillStyle = "#ff8800"; 
                             else ctx.fillStyle = "#ff0000";             
-                            
                             let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
                             ctx.fillRect(bx, by, bw, cellH-1.0);
                         }
 
-                        // ピークバー描画（最後に描画して最前面に）
+                        // ピークバー（白色：最前面に描画）
                         if (peaks[idx][i] > 0.1) {
                             ctx.fillStyle = "#ffffff";
-                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1;
-                            ctx.fillRect(bx, pby, bw, 2); 
+                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.5;
+                            ctx.fillRect(bx, pby, bw, 2); // 厚みを少し持たせて視認性確保
                         }
                     }
 
-                    // --- 3. 下段アナログメーター & テキスト復元 ---
-                    const upY = mtGroupY + (partH * 0.3);
-                    const loY = mtGroupY + (partH * 0.55);
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
-                    ctx.lineWidth = 1;
-                    ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
+                    // --- メーターセクション：文字と線の復元 ---
+                    const meterLineY1 = mtGroupY + partH * 0.3;
+                    const meterLineY2 = mtGroupY + partH * 0.6;
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+                    ctx.beginPath(); ctx.moveTo(startX + 5, meterLineY1); ctx.lineTo(startX + unitW - 5, meterLineY1); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX + 5, meterLineY2); ctx.lineTo(startX + unitW - 5, meterLineY2); ctx.stroke();
 
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center";
-                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
+                    ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
+                    ctx.font = isLandscape ? "9px Arial" : "10px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 20 + k * (unitW-40)/3, meterLineY1 - 5));
+                    ["-40", "-20", "-10", "-5", "0", "+10"].forEach((t, k) => ctx.fillText(t, startX + 20 + k * (unitW-40)/5, meterLineY2 + 12));
 
-                    ctx.textAlign = "right"; 
-                    ctx.font = "bold 10px Arial";
-                    ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
-
-                    ctx.textAlign = "center";
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
-                    ctx.fillStyle = "#0ff";
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
-                    ctx.font = `bold ${isLandscape ? 10 : 12}px Arial`;
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.82); 
+                    ctx.font = "bold 10px Arial";
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.94);
 
-                    // 針の描画
+                    // --- 針の描画 ---
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -202,12 +187,10 @@
                     ctx.stroke(); ctx.restore();
                 });
 
-                // --- 4. ロゴ・クレジット ---
+                // --- ロゴ・クレジット ---
                 const logoY = mtGroupY + partH + (h * 0.08);
                 ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
-                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 11 : 13}px Arial`; 
-                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 16 : 20));
                 ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
                 ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
             }

@@ -63,16 +63,15 @@
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.4; // 応答性を高める
+            analyser.smoothingTimeConstant = 0.4; 
             source.connect(analyser);
             const data = new Uint8Array(analyser.frequencyBinCount);
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
-            // 物理演算用
+            // ピーク制御用
             let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
-            let vels = [new Float32Array(barCount), new Float32Array(barCount)];
-            const gravity = 0.05; // 重力加速度
+            let peakWait = [new Int32Array(barCount), new Int32Array(barCount)]; // 頂点で待機するカウント
 
             let angleSmooth = [0, 0];
             let mtSmooth = [0, 0];
@@ -128,20 +127,19 @@
                         let rawVal = data[i + (idx === 0 ? 2 : 6)] || 0;
                         let targetVal = (rawVal / 255) * numCells;
                         
-                        // --- 改善されたピークホールド・ロジック ---
-                        if (targetVal > peaks[idx][i]) {
+                        // --- 違和感のないディレイ・ピークホールド ---
+                        if (targetVal >= peaks[idx][i]) {
                             peaks[idx][i] = targetVal;
-                            vels[idx][i] = 0; // 上昇時は速度を殺す
+                            peakWait[idx][i] = 15; // 頂点に達したら15フレーム（約0.25秒）待機
                         } else {
-                            // 頂点に達した瞬間から即座に落下処理へ
-                            vels[idx][i] += gravity; 
-                            peaks[idx][i] -= vels[idx][i];
+                            if (peakWait[idx][i] > 0) {
+                                peakWait[idx][i]--; // 待機中
+                            } else {
+                                peaks[idx][i] -= 0.4; // 待機が終わったらスッと一定速度で降りる
+                            }
                         }
 
-                        if (peaks[idx][i] < 0) {
-                            peaks[idx][i] = 0;
-                            vels[idx][i] = 0;
-                        }
+                        if (peaks[idx][i] < 0) peaks[idx][i] = 0;
 
                         let bx = graphX + i * (graphW / barCount) + 1;
                         
@@ -156,8 +154,8 @@
                             ctx.fillRect(bx, by, bw, cellH - 1.0);
                         }
 
-                        // ピークライン描画（常にEQより上にある場合のみ）
-                        if (peaks[idx][i] > targetVal + 0.2) {
+                        // ピークライン描画
+                        if (peaks[idx][i] > targetVal + 0.1) {
                             ctx.fillStyle = "#ffffff";
                             let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.0;
                             ctx.fillRect(bx, pby, bw, 2.0);

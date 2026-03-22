@@ -67,11 +67,10 @@
             const data = new Uint8Array(analyser.frequencyBinCount);
             document.getElementById('overlay').style.display = 'none';
 
-            // --- ピークホールド管理変数 (Float32Arrayで精度を確保) ---
             const barCount = 16;
-            let peaks = [new Float32Array(barCount), new Float32Array(barCount)]; 
-            let peakDrops = [new Float32Array(barCount), new Float32Array(barCount)];
-            let peakHoldCounters = [new Int32Array(barCount), new Int32Array(barCount)];
+            // ピークホールド管理用変数
+            let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
+            let velocities = [new Float32Array(barCount), new Float32Array(barCount)];
 
             let angleSmooth = [0, 0];
             let mtSmooth = [0, 0];
@@ -128,31 +127,27 @@
                     const cellH = (partH - 4) / numCells;
 
                     for (let i = 0; i < barCount; i++) {
-                        // idxに応じて参照するデータ位置を調整（左右の差別化）
-                        let val = data[i + (idx === 0 ? 2 : 5)] || 0;
-                        let activeRaw = (val / 255) * numCells;
-                        let active = Math.floor(activeRaw);
+                        // 左右で異なるサンプルを取得
+                        let val = data[i + (idx === 0 ? 2 : 6)] || 0;
+                        let activeVal = (val / 255) * numCells;
+                        let activeInt = Math.floor(activeVal);
 
-                        // --- ピークホールド・ロジック ---
-                        if (activeRaw >= peaks[idx][i]) {
-                            peaks[idx][i] = activeRaw;
-                            peakDrops[idx][i] = 0;
-                            peakHoldCounters[idx][i] = 35; // 保持フレーム
+                        // --- なめらかなピークホールド物理計算 ---
+                        if (activeVal >= peaks[idx][i]) {
+                            peaks[idx][i] = activeVal;
+                            velocities[idx][i] = 0; // 上昇時は速度リセット
                         } else {
-                            if (peakHoldCounters[idx][i] > 0) {
-                                peakHoldCounters[idx][i]--;
-                            } else {
-                                peakDrops[idx][i] += 0.05; // 落下速度（加速度）
-                                peaks[idx][i] -= peakDrops[idx][i];
-                            }
+                            // 常に重力をかけ、徐々に加速しながら落下
+                            velocities[idx][i] += 0.04; 
+                            peaks[idx][i] -= velocities[idx][i];
                         }
                         if (peaks[idx][i] < 0) peaks[idx][i] = 0;
 
-                        const bx = graphX + i * (graphW/barCount) + 1;
-                        const bw = (graphW/barCount)-2;
+                        let bx = graphX + i * (graphW/barCount) + 1;
+                        let bw = (graphW/barCount)-2;
 
-                        // 通常のカラーセル描画
-                        for (let j = 0; j < active; j++) {
+                        // EQバーの描画
+                        for (let j = 0; j < activeInt; j++) {
                             if (j < 4) ctx.fillStyle = "#00ff00";
                             else if (j < 8) ctx.fillStyle = "#ffff00";
                             else if (j < 12) ctx.fillStyle = "#ff8800";
@@ -162,15 +157,15 @@
                             ctx.fillRect(bx, by, bw, cellH-1.0);
                         }
 
-                        // --- ピークバー（白色）描画：浮動小数点で滑らかに配置 ---
+                        // --- ピークバー(白色)描画：サブピクセル精度 ---
                         if (peaks[idx][i] > 0.1) {
                             ctx.fillStyle = "#ffffff";
-                            // Math.floorを使わずそのまま位置計算することで滑らかに
                             let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.0;
-                            ctx.fillRect(bx, pby, bw, 1.5); 
+                            ctx.fillRect(bx, pby, bw, 2.0); // 視認性のため厚み2px
                         }
                     }
 
+                    // メーター部（ベースコードを完全維持）
                     const upY = mtGroupY + (partH * 0.3);
                     const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";

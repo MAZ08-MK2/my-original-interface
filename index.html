@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>MH DESIGN WORKS - MC2500</title>
+    <title>MAZ08-MK2</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { background:#000; overflow:hidden; height:100vh; width:100vw; display:flex; justify-content:center; align-items:center; }
@@ -69,10 +69,9 @@
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
-            // 物理演算用
             let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
             let vels = [new Float32Array(barCount), new Float32Array(barCount)];
-            const gravity = 0.05; // 重力加速度
+            const gravity = 0.05;
 
             let angleSmooth = [0, 0];
             let mtSmooth = [0, 0];
@@ -108,7 +107,6 @@
                     const graphX = startX + labelW;
                     const graphW = unitW - labelW - 5;
                     
-                    // 背景グリッド描画
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
@@ -128,12 +126,10 @@
                         let rawVal = data[i + (idx === 0 ? 2 : 6)] || 0;
                         let targetVal = (rawVal / 255) * numCells;
                         
-                        // --- 改善されたピークホールド・ロジック ---
                         if (targetVal > peaks[idx][i]) {
                             peaks[idx][i] = targetVal;
-                            vels[idx][i] = 0; // 上昇時は速度を殺す
+                            vels[idx][i] = 0;
                         } else {
-                            // 頂点に達した瞬間から即座に落下処理へ
                             vels[idx][i] += gravity; 
                             peaks[idx][i] -= vels[idx][i];
                         }
@@ -145,7 +141,6 @@
 
                         let bx = graphX + i * (graphW / barCount) + 1;
                         
-                        // EQバーの描画
                         let activeInt = Math.floor(targetVal);
                         for (let j = 0; j < activeInt; j++) {
                             if (j < 4) ctx.fillStyle = "#00ff00";
@@ -156,7 +151,6 @@
                             ctx.fillRect(bx, by, bw, cellH - 1.0);
                         }
 
-                        // ピークライン描画（常にEQより上にある場合のみ）
                         if (peaks[idx][i] > targetVal + 0.2) {
                             ctx.fillStyle = "#ffffff";
                             let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.0;
@@ -164,7 +158,6 @@
                         }
                     }
 
-                    // --- メーター部 ---
                     const upY = mtGroupY + (partH * 0.3);
                     const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
@@ -205,8 +198,8 @@
                 ctx.fillText("McIntosh", w/2, logoY);
                 ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 11 : 13}px Arial`; 
                 ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 16 : 20));
-                ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
-                ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
+                
+                // MH DESIGN WORKS の描画行を削除しました
             }
             draw();
         }

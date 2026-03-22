@@ -86,7 +86,6 @@
                 const deckColor = "rgba(0, 255, 255, 0.7)";
                 ctx.strokeStyle = deckColor; ctx.lineWidth = isLandscape ? 2 : 3;
                 
-                // 外枠
                 ctx.strokeRect(groupX, eqGroupY, groupW, partH);
                 ctx.strokeRect(groupX, mtGroupY, groupW, partH);
 
@@ -99,32 +98,30 @@
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // --- スペアナ部：数値と縦線の描画 ---
-                    const labelW = isLandscape ? 25 : 30;
-                    const graphX = startX + labelW;
-                    const graphW = unitW - labelW - 5;
+                    // --- スペアナ：数値・縦横グリッド ---
+                    const labelArea = isLandscape ? 25 : 30; 
+                    const graphX = startX + labelArea;
+                    const graphW = unitW - labelArea - 5;
                     
-                    // 左側の数値 (+10 to -40)
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
                     const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
+                    
                     levels.forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / 5));
+                        ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
                         ctx.fillText(lv, graphX - 5, ly + 4);
-                        // 横線（グリッド）
                         ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    // 縦線（グリッド）
                     const barCount = 16;
                     for(let i=0; i<=barCount; i++) {
                         let lx = graphX + (i * (graphW / barCount));
                         ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
                     }
 
-                    // --- グライコのバー（3段ずつ色分け） ---
+                    // --- グライコ：3段ずつ色替え (緑→黄→橙→赤) ---
                     const numCells = 15;
                     const cellH = (partH - 4) / numCells;
                     for (let i = 0; i < barCount; i++) {
@@ -132,11 +129,10 @@
                         let active = Math.floor((val / 255) * numCells);
                         for (let j = 0; j < numCells; j++) {
                             if (j < active) {
-                                // 色のロジック修正：下から3段ずつ
-                                if (j < 3) ctx.fillStyle = "#0055ff";      // 青
-                                else if (j < 6) ctx.fillStyle = "#00ff00"; // 緑
-                                else if (j < 9) ctx.fillStyle = "#ffff00"; // 黄
-                                else if (j < 12) ctx.fillStyle = "#ff8800";// オレンジ
+                                // 下から 緑3, 黄3, 橙3, 残り赤
+                                if (j < 3) ctx.fillStyle = "#00ff00";      // 緑
+                                else if (j < 6) ctx.fillStyle = "#ffff00"; // 黄
+                                else if (j < 9) ctx.fillStyle = "#ff8800"; // オレンジ
                                 else ctx.fillStyle = "#ff0000";            // 赤
                                 
                                 let bx = graphX + i * (graphW/barCount) + 1;
@@ -146,31 +142,30 @@
                         }
                     }
 
-                    // --- 下段メーター部 ---
+                    // --- メーター目盛り ---
                     const upY = mtGroupY + (partH * 0.3);
                     const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
                     ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
 
-                    // メーターの数字
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center";
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; 
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
                     ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
 
-                    // --- 【修正】DECIBELS表示：数字と被らない位置（中央下寄り） ---
+                    // --- 【修正】DECIBELS表示：位置を中央寄り・やや下げに調整 ---
                     ctx.textAlign = "center"; 
                     ctx.font = "bold 10px Arial";
-                    ctx.fillText("DECIBELS", cx, mtGroupY + (partH * 0.7));
+                    ctx.fillText("DECIBELS", cx, mtGroupY + (partH * 0.65));
 
-                    // チャンネル名
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
+                    ctx.fillStyle = "#0ff";
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.82); 
                     ctx.font = `bold ${isLandscape ? 10 : 12}px Arial`;
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.94);
 
-                    // 針の描画
+                    // 針
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -184,7 +179,7 @@
                     ctx.stroke(); ctx.restore();
                 });
 
-                // ロゴ部
+                // ロゴ
                 const logoY = mtGroupY + partH + (h * 0.08);
                 ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);

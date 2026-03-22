@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Security Access</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#000; overflow:hidden; height:100vh; width:100vw; display:flex; justify-content:center; align-items:center; }
+        canvas { width:100vw; height:100vh; display:block; background:#000; }
+        #auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #0ff; font-family: sans-serif;
+        }
+        #pass-input {
+            background: #111; border: 2px solid #0ff; color: #0ff;
+            padding: 15px; font-size: 24px; text-align: center; border-radius: 10px;
+            width: 200px; outline: none; margin-bottom: 20px;
+        }
+        #auth-btn { padding: 10px 30px; border: 1px solid #0ff; background: transparent; color: #0ff; cursor: pointer; border-radius: 5px; }
+        #overlay {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.95); z-index:100;
+            display:none; justify-content:center; align-items:center; cursor:pointer;
+        }
+        .btn-ui { padding:30px 60px; border:3px solid #0ff; border-radius:60px; font-size:28px; font-weight:bold; background:#001a1a; color:#0ff; }
+    </style>
+</head>
+<body>
+    <div id="auth-overlay">
+        <h2>SECURITY ACCESS</h2>
+        <input type="password" id="pass-input" placeholder="PASSCODE" inputmode="numeric">
+        <button id="auth-btn" onclick="checkPass()">ENTER</button>
+    </div>
+    <div id="overlay" onclick="startAudio()"><div class="btn-ui">SYSTEM RECOVERY START</div></div>
+    <canvas id="c"></canvas>
+
+    <script>
+        const PASS = "0310"; 
+        function checkPass() {
+            const input = document.getElementById('pass-input').value;
+            if(input === PASS) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('overlay').style.display = 'flex'; 
+            } else {
+                alert("ACCESS DENIED"); document.getElementById('pass-input').value = "";
+            }
+        }
+
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        async function startAudio() {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const source = audioCtx.createMediaStreamSource(stream);
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            document.getElementById('overlay').style.display = 'none';
+
+            let angleSmooth = [0, 0];
+            const peaks = new Array(32).fill(0);
+            let mtSmooth = [0, 0];
+
+            function draw() {
+                requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(data);
+                const w = canvas.width, h = canvas.height;
+                ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+
+                const groupW = w * 0.94;
+                const groupX = (w - groupW) / 2;
+                const partH = h * 0.25; 
+                const eqGroupY = 30;
+                const mtGroupY = eqGroupY + partH + 12;
+                const deckColor = "rgba(0, 255, 255, 0.65)";
+
+                // 外枠
+                ctx.strokeStyle = deckColor; ctx.lineWidth = 4;
+                ctx.strokeRect(groupX, eqGroupY, groupW, partH);
+                ctx.strokeRect(groupX, mtGroupY, groupW, partH);
+
+                const unitW = (groupW * 0.46);
+                const centers = [w * 0.27, w * 0.73];
+
+                centers.forEach((cx, idx) => {
+                    const startX = cx - unitW / 2;
+                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1.5;
+                    ctx.strokeRect(startX, eqGroupY, unitW, partH);
+                    ctx.strokeRect(startX, mtGroupY, unitW, partH);
+
+                    // --- スペアナ（グライコ）描画 ---
+                    const barCount = 16, numCells = 24, cellH = partH / numCells;
+                    
+                    // グライコ目盛り線と数字の復活
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.3)"; ctx.lineWidth = 1;
+                    const eqLIdxs = [4, 8, 12, 16, 20, 23];
+                    const eqLabels = ["-40", "-20", "-10", "0", "+5", "+10"];
+                    
+                    eqLIdxs.forEach((lIdx, k) => {
+                        let ly = eqGroupY + (partH - (lIdx * cellH));
+                        ctx.beginPath(); ctx.moveTo(startX, ly); ctx.lineTo(startX + unitW, ly); ctx.stroke();
+                        
+                        // 数字の描画
+                        ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
+                        ctx.font = "10px Arial"; ctx.textAlign = "left";
+                        ctx.fillText(eqLabels[k], startX + 2, ly - 2);
+                    });
+
+                    for (let i = 0; i < barCount; i++) {
+                        let val = data[i+2] || 0;
+                        let active = Math.floor((val / 255) * numCells * 0.9);
+                        let pIdx = (idx * 16) + i;
+                        if (active >= peaks[pIdx]) peaks[pIdx] = active; else peaks[pIdx] -= 0.15;
+                        for (let j = 0; j < numCells; j++) {
+                            let bx = startX + i * (unitW/barCount) + 2, by = eqGroupY + (numCells-1-j) * cellH;
+                            if (j < active) {
+                                ctx.fillStyle = j<5?"#0055ff":j<10?"#00ff00":j<15?"#ffff00":"#ff0000";
+                                ctx.fillRect(bx, by+1, (unitW/barCount)-4, cellH-2);
+                            } else if (j === Math.floor(peaks[pIdx]) && peaks[pIdx]>0) {
+                                ctx.fillStyle = "#fff"; ctx.fillRect(bx, by+1, (unitW/barCount)-4, cellH-2);
+                            }
+                        }
+                    }
+
+                    // --- レベルメーター描画 ---
+                    const upY = mtGroupY + (partH * 0.38), loY = mtGroupY + (partH * 0.55);
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.5)";
+                    ctx.beginPath(); ctx.moveTo(startX, upY); ctx.lineTo(startX + unitW, upY); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX, loY); ctx.lineTo(startX + unitW, loY); ctx.stroke();
+
+                    // WATTS (上)
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; ctx.font = "10px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => {
+                        ctx.fillText(t, startX + 20 + k * (unitW-40)/3, upY - 8);
+                    });
+                    ctx.font = "bold 11px Arial"; ctx.fillText("WATTS", cx + (unitW * 0.3), mtGroupY + 15);
+
+                    // DECIBELS (下)
+                    ctx.font = "10px Arial";
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => {
+                        ctx.fillText(tx, startX + 20 + k * (unitW-40)/5, loY + 14);
+                    });
+                    ctx.textAlign = "right"; ctx.fillText("DECIBELS", startX + unitW - 8, mtGroupY + partH - 8);
+
+                    // ★ 文字を数字のさらに下へ
+                    ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
+                    ctx.font = "bold 16px Arial";
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, loY + 40); 
+                    ctx.font = "bold 12px Arial";
+                    ctx.fillText("POWER OUTPUT", cx, loY + 56);
+
+                    // 針
+                    let vMt = (data[idx===0?4:10] || 0);
+                    mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
+                    let ang = -0.3 + (mtSmooth[idx]/255) * 0.6;
+                    angleSmooth[idx] += (ang - angleSmooth[idx]) * 0.15;
+                    ctx.save();
+                    ctx.beginPath(); ctx.rect(startX, mtGroupY, unitW, partH); ctx.clip();
+                    ctx.strokeStyle = "red"; ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.moveTo(cx, mtGroupY + partH + 110);
+                    ctx.lineTo(cx + Math.sin(angleSmooth[idx])*450, mtGroupY + partH + 110 - Math.cos(angleSmooth[idx])*450);
+                    ctx.stroke(); ctx.restore();
+                });
+
+                // ロゴ (MH DESIGN WORKS を救出)
+                const logoY = mtGroupY + partH + 42;
+                ctx.fillStyle = "#00ff00"; ctx.font = "bold 38px 'Times New Roman'"; ctx.textAlign = "center";
+                ctx.fillText("McIntosh", w/2, logoY);
+                ctx.fillStyle = "#fff"; ctx.font = "13px Arial"; 
+                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + 18);
+                ctx.fillStyle = "red"; ctx.font = "bold 17px Arial"; 
+                ctx.fillText("MH DESIGN WORKS", w/2, logoY + 38);
+            }
+            draw();
+        }
+    </script>
+</body>
+</html>

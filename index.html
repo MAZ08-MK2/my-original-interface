@@ -68,10 +68,10 @@
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
-            // ピークホールド管理用
-            let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
+            // --- 改良版ピークホールド管理変数 ---
+            let peaks = [new Float32Array(barCount), new Float32Array(barCount)]; 
             let peakDrops = [new Float32Array(barCount), new Float32Array(barCount)];
-            let peakHold = [new Int32Array(barCount), new Int32Array(barCount)];
+            let peakHoldCounters = [new Int32Array(barCount), new Int32Array(barCount)];
 
             let angleSmooth = [0, 0];
             let mtSmooth = [0, 0];
@@ -90,12 +90,8 @@
                 const mtGroupY = eqGroupY + partH + (h * 0.03); 
 
                 const deckColor = "rgba(0, 255, 255, 0.7)";
-                ctx.strokeStyle = deckColor; ctx.lineWidth = isLandscape ? 2 : 3;
-                ctx.strokeRect(groupX, eqGroupY, groupW, partH);
-                ctx.strokeRect(groupX, mtGroupY, groupW, partH);
-
-                const unitW = (groupW * 0.47);
                 const centers = [w * 0.265, w * 0.735];
+                const unitW = (groupW * 0.47);
 
                 centers.forEach((cx, idx) => {
                     const startX = cx - unitW / 2;
@@ -106,82 +102,62 @@
                     const labelW = isLandscape ? 25 : 30;
                     const graphX = startX + labelW;
                     const graphW = unitW - labelW - 5;
-                    
-                    // 背景目盛り
+                    const numCells = 30;
+                    const cellH = (partH - 4) / numCells;
+
+                    // 目盛り描画
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-                    const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
-                    levels.forEach((lv, i) => {
+                    ["+10", "+5", "0", "-10", "-20", "-40"].forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / 5));
                         ctx.fillText(lv, graphX - 5, ly + 4);
                         ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    const numCells = 30;
-                    const cellH = (partH - 4) / numCells;
-                    
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
                         let active = (val / 255) * numCells;
                         
-                        // --- 改良版ピークホールドロジック ---
+                        // --- ピークホールド・ロジック ---
                         if (active >= peaks[idx][i]) {
                             peaks[idx][i] = active;
                             peakDrops[idx][i] = 0;
-                            peakHold[idx][i] = 30; // 30フレーム(約0.5秒)保持
+                            peakHoldCounters[idx][i] = 35; // 保持フレーム数
                         } else {
-                            if (peakHold[idx][i] > 0) {
-                                peakHold[idx][i]--;
+                            if (peakHoldCounters[idx][i] > 0) {
+                                peakHoldCounters[idx][i]--;
                             } else {
-                                peakDrops[idx][i] += 0.05; // 落下加速度
+                                peakDrops[idx][i] += 0.06; // 落下速度（加速度）
                                 peaks[idx][i] -= peakDrops[idx][i];
                             }
                         }
                         if (peaks[idx][i] < 0) peaks[idx][i] = 0;
 
                         let bx = graphX + i * (graphW/barCount) + 1;
-                        let bWidth = (graphW/barCount) - 2;
+                        let bw = (graphW/barCount)-2;
 
-                        // 通常バー描画
-                        let activeInt = Math.floor(active);
-                        for (let j = 0; j < activeInt; j++) {
+                        // 通常セル描画
+                        for (let j = 0; j < Math.floor(active); j++) {
                             if (j < 4) ctx.fillStyle = "#00ff00";      
                             else if (j < 8) ctx.fillStyle = "#ffff00"; 
                             else if (j < 12) ctx.fillStyle = "#ff8800"; 
                             else ctx.fillStyle = "#ff0000";             
                             
                             let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
-                            ctx.fillRect(bx, by, bWidth, cellH - 1.0);
+                            ctx.fillRect(bx, by, bw, cellH-1.0);
                         }
 
-                        // 白色ピークバー描画
-                        if (peaks[idx][i] > 0) {
+                        // --- ピークバー（白色）描画 ---
+                        if (peaks[idx][i] > 0.1) {
                             ctx.fillStyle = "#ffffff";
                             let pby = eqGroupY + partH - (Math.floor(peaks[idx][i]) + 1) * cellH - 0.5;
-                            // 既存のバーより上に描画されるように
-                            ctx.fillRect(bx, pby, bWidth, cellH - 1.0);
+                            ctx.fillRect(bx, pby, bw, cellH-1.0);
                         }
                     }
 
-                    // 下段メーター
-                    const upY = mtGroupY + (partH * 0.3);
-                    const loY = mtGroupY + (partH * 0.55);
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
-                    ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
-
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center";
-                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
-
-                    ctx.textAlign = "center";
-                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
-                    ctx.fillStyle = "#0ff";
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
-
+                    // 下段アナログメーター
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -193,13 +169,16 @@
                     ctx.beginPath(); ctx.moveTo(cx, pivotY);
                     ctx.lineTo(cx + Math.sin(angleSmooth[idx])*h, pivotY - Math.cos(angleSmooth[idx])*h);
                     ctx.stroke(); ctx.restore();
+                    
+                    ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
+                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
                 });
 
+                // ロゴ等
                 const logoY = mtGroupY + partH + (h * 0.08);
                 ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
-                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 11 : 13}px Arial`; 
-                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 16 : 20));
                 ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
                 ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
             }

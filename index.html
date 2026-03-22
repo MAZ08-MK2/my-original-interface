@@ -77,23 +77,22 @@
                 const w = canvas.width, h = canvas.height;
                 ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
 
-                const groupW = w * 0.94;
+                const groupW = w * 0.96;
                 const groupX = (w - groupW) / 2;
                 
-                // ★ 修正ポイント：上下の枠を「同じ高さ」でゆったり広げる
-                const partH = h * 0.30; // 画面の30%をそれぞれの枠に割り当て
-                const eqGroupY = 15;    // 開始位置を極限まで上げる
-                const mtGroupY = eqGroupY + partH + 8; // 隙間を最小限に
+                // ★ 修正：枠の高さ(partH)を数値で大きく固定
+                const partH = 210; 
+                const eqGroupY = 10; 
+                const mtGroupY = eqGroupY + partH + 10; 
 
-                const deckColor = "rgba(0, 255, 255, 0.65)";
+                const deckColor = "rgba(0, 255, 255, 0.7)";
 
-                // 外枠
                 ctx.strokeStyle = deckColor; ctx.lineWidth = 3;
                 ctx.strokeRect(groupX, eqGroupY, groupW, partH);
                 ctx.strokeRect(groupX, mtGroupY, groupW, partH);
 
-                const unitW = (groupW * 0.46);
-                const centers = [w * 0.27, w * 0.73];
+                const unitW = (groupW * 0.47);
+                const centers = [w * 0.265, w * 0.735];
 
                 centers.forEach((cx, idx) => {
                     const startX = cx - unitW / 2;
@@ -101,64 +100,60 @@
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // --- グライコ描画 ---
-                    const barCount = 16, numCells = 24, cellH = partH / numCells;
+                    // --- スペアナ ---
+                    const barCount = 16, numCells = 20, cellH = (partH - 10) / numCells;
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i+2] || 0;
-                        let active = Math.floor((val / 255) * numCells * 0.85);
-                        let pIdx = (idx * 16) + i;
-                        if (active >= peaks[pIdx]) peaks[pIdx] = active; else peaks[pIdx] -= 0.15;
+                        let active = Math.floor((val / 255) * numCells * 0.9);
                         for (let j = 0; j < numCells; j++) {
-                            let bx = startX + i * (unitW/barCount) + 2, by = eqGroupY + (numCells-1-j) * cellH;
+                            let bx = startX + i * (unitW/barCount) + 2, by = eqGroupY + partH - (j + 1) * cellH - 5;
                             if (j < active) {
-                                ctx.fillStyle = j<5?"#0055ff":j<10?"#00ff00":j<15?"#ffff00":"#ff0000";
-                                ctx.fillRect(bx, by+1, (unitW/barCount)-4, cellH-2);
+                                ctx.fillStyle = j<4?"#0055ff":j<10?"#00ff00":j<15?"#ffff00":"#ff0000";
+                                ctx.fillRect(bx, by, (unitW/barCount)-4, cellH-2);
                             }
                         }
                     }
 
-                    // --- レベルメーター描画 ---
-                    // 目盛り線を中央付近に配置
-                    const upY = mtGroupY + (partH * 0.3);
-                    const loY = mtGroupY + (partH * 0.45);
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.5)";
-                    ctx.beginPath(); ctx.moveTo(startX, upY); ctx.lineTo(startX + unitW, upY); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(startX, loY); ctx.lineTo(startX + unitW, loY); ctx.stroke();
+                    // --- レベルメーター ---
+                    const upY = mtGroupY + 65;
+                    const loY = mtGroupY + 110;
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
+                    ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
 
-                    // WATTS / DECIBELS 数値
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; ctx.font = "10px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 20 + k * (unitW-40)/3, upY - 8));
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 20 + k * (unitW-40)/5, loY + 14));
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; ctx.font = "11px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 30 + k * (unitW-60)/3, upY - 10));
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 30 + k * (unitW-60)/5, loY + 18));
 
-                    // ★ 修正ポイント：文字を枠の底辺ギリギリに配置して重なりを解消
+                    // ★ 文字の配置を枠の底辺に合わせる
                     ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
-                    ctx.font = "bold 16px Arial";
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH - 35); 
-                    ctx.font = "bold 12px Arial";
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH - 15);
+                    ctx.font = "bold 18px Arial";
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH - 45); 
+                    ctx.font = "bold 13px Arial";
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH - 20);
 
                     // 針
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
-                    let ang = -0.3 + (mtSmooth[idx]/255) * 0.6;
+                    let ang = -0.35 + (mtSmooth[idx]/255) * 0.7;
                     angleSmooth[idx] += (ang - angleSmooth[idx]) * 0.15;
                     ctx.save();
                     ctx.beginPath(); ctx.rect(startX, mtGroupY, unitW, partH); ctx.clip();
                     ctx.strokeStyle = "red"; ctx.lineWidth = 3;
-                    const pivotY = mtGroupY + partH + 100;
+                    const pivotY = mtGroupY + partH + 120;
                     ctx.beginPath(); ctx.moveTo(cx, pivotY);
-                    ctx.lineTo(cx + Math.sin(angleSmooth[idx])*480, pivotY - Math.cos(angleSmooth[idx])*480);
+                    ctx.lineTo(cx + Math.sin(angleSmooth[idx])*550, pivotY - Math.cos(angleSmooth[idx])*550);
                     ctx.stroke(); ctx.restore();
                 });
 
-                // ロゴ（全体の描画位置が上がったので、赤いロゴまで見えるはずです）
-                const logoY = mtGroupY + partH + 35;
-                ctx.fillStyle = "#00ff00"; ctx.font = "bold 34px 'Times New Roman'"; ctx.textAlign = "center";
+                // ロゴ
+                const logoY = mtGroupY + partH + 45;
+                ctx.fillStyle = "#00ff00"; ctx.font = "bold 42px 'Times New Roman'"; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
-                ctx.fillStyle = "#fff"; ctx.font = "12px Arial"; 
-                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + 18);
-                ctx.fillStyle = "red"; ctx.font = "bold 16px Arial"; 
-                ctx.fillText("MH DESIGN WORKS", w/2, logoY + 36);
+                ctx.fillStyle = "#fff"; ctx.font = "14px Arial"; 
+                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + 22);
+                ctx.fillStyle = "red"; ctx.font = "bold 18px Arial"; 
+                ctx.fillText("MH DESIGN WORKS", w/2, logoY + 44);
             }
             draw();
         }

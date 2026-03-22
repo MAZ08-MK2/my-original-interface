@@ -68,8 +68,7 @@
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
-            // ピーク保持用の配列を初期化
-            let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
+            let peaks = [new Float32Array(barCount), new Float32Array(barCount)]; 
             let peakDrops = [new Float32Array(barCount), new Float32Array(barCount)];
             let peakHoldCounters = [new Int32Array(barCount), new Int32Array(barCount)];
 
@@ -105,29 +104,39 @@
                     const numCells = 30;
                     const cellH = (partH - 4) / numCells;
 
-                    // 目盛り描画省略せず実行
+                    // --- 1. 目盛り・グリッドラインの描画 ---
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
-                    ["+10", "+5", "0", "-10", "-20", "-40"].forEach((lv, i) => {
+                    const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
+                    levels.forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / 5));
                         ctx.fillText(lv, graphX - 5, ly + 4);
+                        ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
+                        ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
+                    // 縦ライン描画
+                    for(let i=0; i<=barCount; i++) {
+                        let lx = graphX + (i * (graphW / barCount));
+                        ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
+                    }
+
+                    // --- 2. カラーバー & ピークホールドの計算 ---
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
                         let active = (val / 255) * numCells;
                         
-                        // --- 物理シミュレーションベースのピークホールド ---
+                        // 落下ロジック（浮動小数点で計算）
                         if (active >= peaks[idx][i]) {
                             peaks[idx][i] = active;
                             peakDrops[idx][i] = 0;
-                            peakHoldCounters[idx][i] = 45; // 保持フレーム（約0.7秒）
+                            peakHoldCounters[idx][i] = 40; 
                         } else {
                             if (peakHoldCounters[idx][i] > 0) {
                                 peakHoldCounters[idx][i]--;
                             } else {
-                                peakDrops[idx][i] += 0.012; // 落下加速度（小さいほどゆっくり）
+                                peakDrops[idx][i] += 0.015; // 落下加速度（小さいほど滑らか）
                                 peaks[idx][i] -= peakDrops[idx][i];
                             }
                         }
@@ -136,26 +145,50 @@
                         let bx = graphX + i * (graphW/barCount) + 1;
                         let bw = (graphW/barCount)-2;
 
-                        // カラーバー描画
+                        // 通常セル描画
                         for (let j = 0; j < Math.floor(active); j++) {
-                            if (j < 5) ctx.fillStyle = "#00ff00";
-                            else if (j < 12) ctx.fillStyle = "#ffff00";
-                            else if (j < 20) ctx.fillStyle = "#ff8800";
-                            else ctx.fillStyle = "#ff0000";
+                            if (j < 5) ctx.fillStyle = "#00ff00";      
+                            else if (j < 12) ctx.fillStyle = "#ffff00"; 
+                            else if (j < 20) ctx.fillStyle = "#ff8800"; 
+                            else ctx.fillStyle = "#ff0000";             
+                            
                             let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
                             ctx.fillRect(bx, by, bw, cellH-1.0);
                         }
 
-                        // --- 白いバー（ピークライン）の描画 ---
-                        // activeよりわずかに上、またはactiveと同じ位置でも「線」として描画
+                        // ピークバー描画（最後に描画して最前面に）
                         if (peaks[idx][i] > 0.1) {
                             ctx.fillStyle = "#ffffff";
                             let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1;
-                            ctx.fillRect(bx, pby, bw, 2); // 2pxの厚みで視認性向上
+                            ctx.fillRect(bx, pby, bw, 2); 
                         }
                     }
 
-                    // メーター針の描画
+                    // --- 3. 下段アナログメーター & テキスト復元 ---
+                    const upY = mtGroupY + (partH * 0.3);
+                    const loY = mtGroupY + (partH * 0.55);
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
+
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center";
+                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
+
+                    ctx.textAlign = "right"; 
+                    ctx.font = "bold 10px Arial";
+                    ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
+
+                    ctx.textAlign = "center";
+                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
+                    ctx.fillStyle = "#0ff";
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
+                    ctx.font = `bold ${isLandscape ? 10 : 12}px Arial`;
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);
+
+                    // 針の描画
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -169,10 +202,12 @@
                     ctx.stroke(); ctx.restore();
                 });
 
-                // ロゴ等
+                // --- 4. ロゴ・クレジット ---
                 const logoY = mtGroupY + partH + (h * 0.08);
                 ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
+                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 11 : 13}px Arial`; 
+                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 16 : 20));
                 ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
                 ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
             }

@@ -5,36 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title> Security Access</title>
+    <title>MH DESIGN WORKS - MC2500</title>
     <style>
-        /* パスワード画面のスタイル */
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#000; overflow:hidden; height:100vh; width:100vw; display:flex; justify-content:center; align-items:center; }
+        canvas { width:100vw; height:100vh; display:block; background:#000; }
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 2000;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             color: #0ff; font-family: sans-serif;
         }
-        #auth-overlay h2 { margin-bottom: 20px; letter-spacing: 2px; font-size: 18px; }
         #pass-input {
             background: #111; border: 2px solid #0ff; color: #0ff;
             padding: 15px; font-size: 24px; text-align: center; border-radius: 10px;
             width: 200px; outline: none; margin-bottom: 20px;
         }
-        #auth-btn {
-            padding: 10px 30px; border: 1px solid #0ff; background: transparent;
-            color: #0ff; cursor: pointer; border-radius: 5px;
-        }
-
-        /* 廣内さんの最終版スタイル（そのまま維持） */
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { background:#000; overflow:hidden; height:100vh; width:100vw; display:flex; justify-content:center; align-items:center; }
-        canvas { width:100vw; height:100vh; display:block; background:#000; }
+        #auth-btn { padding: 10px 30px; border: 1px solid #0ff; background: transparent; color: #0ff; cursor: pointer; border-radius: 5px; }
         #overlay {
             position:absolute; top:0; left:0; width:100%; height:100%;
             background:rgba(0,0,0,0.95); z-index:100;
             display:none; justify-content:center; align-items:center; cursor:pointer;
         }
-        .btn-ui { padding:30px 60px; border:3px solid #0ff; border-radius:60px; font-size:28px; font-weight:bold; background:#001a1a; color:#0ff; }
+        .btn-ui { padding:20px 40px; border:2px solid #0ff; border-radius:40px; font-size:20px; font-weight:bold; background:#001a1a; color:#0ff; }
     </style>
 </head>
 <body>
@@ -43,34 +36,24 @@
         <input type="password" id="pass-input" placeholder="PASSCODE" inputmode="numeric">
         <button id="auth-btn" onclick="checkPass()">ENTER</button>
     </div>
-
-    <div id="overlay" onclick="startAudio()">
-        <div class="btn-ui">SYSTEM RECOVERY START</div>
-    </div>
+    <div id="overlay" onclick="startAudio()"><div class="btn-ui">SYSTEM RECOVERY START</div></div>
     <canvas id="c"></canvas>
 
     <script>
-        // --- パスワード処理 ---
-        const PASS = "0310"; // ★パスコードはそのまま維持
+        const PASS = "0310"; 
         function checkPass() {
             const input = document.getElementById('pass-input').value;
             if(input === PASS) {
                 document.getElementById('auth-overlay').style.display = 'none';
-                document.getElementById('overlay').style.display = 'flex'; // システムボタンを表示
+                document.getElementById('overlay').style.display = 'flex'; 
             } else {
-                alert("ACCESS DENIED");
-                document.getElementById('pass-input').value = "";
+                alert("ACCESS DENIED"); document.getElementById('pass-input').value = "";
             }
         }
 
-        // --- 以下、廣内さんの最終版ロジック（描画部分のみ修正） ---
         const canvas = document.getElementById('c');
         const ctx = canvas.getContext('2d');
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.addEventListener('resize', resize);
         resize();
 
@@ -80,14 +63,17 @@
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.85;
             source.connect(analyser);
             const data = new Uint8Array(analyser.frequencyBinCount);
             document.getElementById('overlay').style.display = 'none';
 
-            let angleSmooth = 0;
-            const peaks = new Array(32).fill(0);
-            let mtSmooth = 0;
+            const barCount = 16;
+            let peaks = [new Float32Array(barCount), new Float32Array(barCount)]; 
+            let peakDrops = [new Float32Array(barCount), new Float32Array(barCount)];
+            let peakHoldCounters = [new Int32Array(barCount), new Int32Array(barCount)];
+
+            let angleSmooth = [0, 0];
+            let mtSmooth = [0, 0];
 
             function draw() {
                 requestAnimationFrame(draw);
@@ -95,122 +81,121 @@
                 const w = canvas.width, h = canvas.height;
                 ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
 
-                const groupW = w * 0.94;
-                const groupX = (w - groupW) / 2;
-                const partH = h * 0.22;
-                const gap = 15;
-                
-                const eqGroupY = 60;
-                const mtGroupY = eqGroupY + partH + gap;
-                const deckColor = "rgba(0, 255, 255, 0.65)";
+                const isLandscape = w > h;
+                const groupW = w * 0.96;
+                const partH = h * 0.32; 
+                const eqGroupY = h * 0.05; 
+                const mtGroupY = eqGroupY + partH + (h * 0.03); 
 
-                ctx.strokeStyle = deckColor; ctx.lineWidth = 5;
-                ctx.strokeRect(groupX, eqGroupY, groupW, partH);
-                ctx.strokeRect(groupX, mtGroupY, groupW, partH);
-
-                const unitW = (groupW * 0.46);
-                const centers = [w * 0.27, w * 0.73];
-                const barCount = 16, numCells = 24;
-                const cellH = partH / numCells;
+                const deckColor = "rgba(0, 255, 255, 0.7)";
+                const centers = [w * 0.265, w * 0.735];
+                const unitW = (groupW * 0.47);
 
                 centers.forEach((cx, idx) => {
                     const startX = cx - unitW / 2;
-                    const barSpacing = unitW / barCount;
+                    const labelW = isLandscape ? 25 : 30;
+                    const graphX = startX + labelW;
+                    const graphW = unitW - labelW - 5;
+                    const numCells = 30;
+                    const cellH = (partH - 4) / numCells;
 
-                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1.5;
+                    // 1. 背景・枠線の描画
+                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1;
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
+                    ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.4)"; ctx.lineWidth = 1;
-                    const eqLIdxs = [3, 6, 10, 14, 18, 22];
-                    eqLIdxs.forEach(lIdx => {
-                        let ly = eqGroupY + (partH - (lIdx * cellH));
-                        ctx.beginPath(); ctx.moveTo(startX, ly); ctx.lineTo(startX + unitW, ly); ctx.stroke();
+                    // 2. EQセクション：グリッド線とデシベル目盛りの描画
+                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
+                    ctx.textAlign = "right";
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
+                    const dbs = ["+10", "+5", "0", "-10", "-20", "-40"];
+                    dbs.forEach((lv, i) => {
+                        let ly = eqGroupY + (partH * (i / 5));
+                        ctx.fillText(lv, graphX - 5, ly + 4);
+                        ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
+                        ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.font = "bold 10px Arial";
-                    ctx.textAlign = "left"; ctx.textBaseline = "middle";
-                    const labels = ["-40", "-20", "-10", "0", "+5", "+10"];
-                    labels.forEach((txt, k) => {
-                        let ly = eqGroupY + (partH - (eqLIdxs[k] * cellH));
-                        ctx.fillText(txt, startX + 4, ly - 7);
-                    });
-
+                    // 3. EQバーとピークの計算・描画
                     for (let i = 0; i < barCount; i++) {
-                        let val = data[i+2] || 0;
-                        let active = Math.floor((val / 255) * numCells * 0.7); 
-                        let pIdx = (idx * 16) + i;
-                        if (active >= peaks[pIdx]) peaks[pIdx] = active; else peaks[pIdx] -= 0.15;
+                        let val = data[i + (idx === 0 ? 2 : 5)] || 0; 
+                        let active = (val / 255) * numCells;
                         
-                        for (let j = 0; j < numCells; j++) {
-                            let bx = startX + i * barSpacing + 2, by = eqGroupY + ((numCells - 1) - j) * cellH;
-                            if (j < active) {
-                                if (j < 3) ctx.fillStyle = "#0f0";
-                                else if (j < 6) ctx.fillStyle = "#ff0";
-                                else if (j < 10) ctx.fillStyle = "#f90";
-                                else ctx.fillStyle = "#f00";
-                                ctx.fillRect(bx, by + 1, barSpacing - 4, cellH - 2);
-                            } else if (j === Math.floor(peaks[pIdx]) && peaks[pIdx] > 0) {
-                                ctx.fillStyle = "#fff"; ctx.fillRect(bx, by + 1, barSpacing - 4, cellH - 2);
+                        // 滑らかな落下ロジック
+                        if (active >= peaks[idx][i]) {
+                            peaks[idx][i] = active;
+                            peakDrops[idx][i] = 0;
+                            peakHoldCounters[idx][i] = 30; 
+                        } else {
+                            if (peakHoldCounters[idx][i] > 0) {
+                                peakHoldCounters[idx][i]--;
+                            } else {
+                                peakDrops[idx][i] += 0.02; // 重力加速度（小さいほど滑らか）
+                                peaks[idx][i] -= peakDrops[idx][i];
                             }
+                        }
+                        if (peaks[idx][i] < 0) peaks[idx][i] = 0;
+
+                        let bx = graphX + i * (graphW/barCount) + 1;
+                        let bw = (graphW/barCount)-2;
+
+                        // カラーバー描画
+                        for (let j = 0; j < Math.floor(active); j++) {
+                            if (j < 6) ctx.fillStyle = "#00ff00";      
+                            else if (j < 15) ctx.fillStyle = "#ffff00"; 
+                            else if (j < 24) ctx.fillStyle = "#ff8800"; 
+                            else ctx.fillStyle = "#ff0000";             
+                            let by = eqGroupY + partH - (j + 1) * cellH - 0.5;
+                            ctx.fillRect(bx, by, bw, cellH-1.0);
+                        }
+
+                        // ピークバー（白）描画：端数を維持して滑らかに
+                        if (peaks[idx][i] > 0.1) {
+                            ctx.fillStyle = "#ffffff";
+                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1;
+                            ctx.fillRect(bx, pby, bw, 2); 
                         }
                     }
 
-                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1.5;
-                    ctx.strokeRect(startX, mtGroupY, unitW, partH);
-                    const upY = mtGroupY + (partH * 0.45), loY = mtGroupY + (partH * 0.55);
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.6)"; ctx.lineWidth = 1.5;
-                    ctx.beginPath(); ctx.moveTo(startX, upY); ctx.lineTo(startX + unitW, upY); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(startX, loY); ctx.lineTo(startX + unitW, loY); ctx.stroke();
+                    // 4. アナログメーターセクション：文字・目盛りの復元
+                    const mLineY1 = mtGroupY + partH * 0.35;
+                    const mLineY2 = mtGroupY + partH * 0.65;
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+                    ctx.beginPath(); ctx.moveTo(startX + 10, mLineY1); ctx.lineTo(startX + unitW - 10, mLineY1); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(startX + 10, mLineY2); ctx.lineTo(startX + unitW - 10, mLineY2); ctx.stroke();
 
-                    ctx.strokeStyle = "rgba(0, 255, 255, 0.3)"; ctx.lineWidth = 0.5;
-                    for (let x = 1; x < 14; x++) {
-                        let tx = startX + x * (unitW / 14);
-                        ctx.beginPath(); ctx.moveTo(tx, mtGroupY); ctx.lineTo(tx, upY - 4); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(tx, loY + 4); ctx.lineTo(tx, mtGroupY + partH); ctx.stroke();
-                    }
+                    ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
+                    ctx.font = isLandscape ? "9px Arial" : "10px Arial";
+                    const watts = ["1.2", "12", "120", "1.2k"];
+                    watts.forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, mLineY1 - 6));
+                    const dbTicks = ["-40", "-20", "-10", "-5", "0", "+10"];
+                    dbTicks.forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/5, mLineY2 + 13));
 
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center";
-                    ctx.font = "bold 12px Arial"; ctx.fillText("WATTS", cx + (unitW * 0.3), mtGroupY + 18);
-                    ctx.font = "11px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => {
-                        ctx.fillText(t, startX + 15 + k * (unitW-30)/3, upY - 10); 
-                    });
-                    ctx.textAlign = "right"; ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 18);
-                    ctx.textAlign = "center";
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => {
-                        ctx.fillText(tx, startX + 15 + k * (unitW-30)/5, loY + 18);
-                    });
+                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
+                    ctx.font = "bold 10px Arial";
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.96);
 
-                    let vMt = (data[idx===0?4:idx+10] || 0);
-                    mtSmooth += (vMt - mtSmooth) * 0.08;
-                    let ang = -0.3 + (mtSmooth/255) * 0.6;
-                    angleSmooth += (ang - angleSmooth) * 0.12;
-
+                    // 5. 針の描画
+                    let vMt = (data[idx===0?4:10] || 0);
+                    mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
+                    let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
+                    angleSmooth[idx] += (ang - angleSmooth[idx]) * 0.15;
                     ctx.save();
                     ctx.beginPath(); ctx.rect(startX, mtGroupY, unitW, partH); ctx.clip();
-                    ctx.strokeStyle = "rgba(255, 20, 20, 0.9)"; ctx.lineWidth = 3;
-                    ctx.beginPath(); ctx.moveTo(cx, mtGroupY + partH + 150);
-                    ctx.lineTo(cx + Math.sin(angleSmooth)*500, mtGroupY + partH + 150 - Math.cos(angleSmooth)*500);
-                    ctx.stroke();
-                    ctx.restore();
-
-                    ctx.font = "bold 15px Arial"; ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH - 30);
-                    ctx.font = "bold 12px Arial"; ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH - 12);
+                    ctx.strokeStyle = "red"; ctx.lineWidth = 2.5;
+                    const pivotY = mtGroupY + partH * 1.5;
+                    ctx.beginPath(); ctx.moveTo(cx, pivotY);
+                    ctx.lineTo(cx + Math.sin(angleSmooth[idx])*h, pivotY - Math.cos(angleSmooth[idx])*h);
+                    ctx.stroke(); ctx.restore();
                 });
 
-                const logoY = mtGroupY + partH + 55;
-                // 元のMcIntoshロゴ（そのまま）
-                ctx.fillStyle = "#00ff00"; ctx.font = "bold 42px 'Times New Roman'"; ctx.textAlign = "center";
+                // 6. ロゴ部分
+                const logoY = mtGroupY + partH + (h * 0.08);
+                ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
-                // 元のMC2500テキスト（そのまま）
-                ctx.fillStyle = "#fff"; ctx.font = "15px Arial";
-                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + 22);
-
-                // --- ★ここから修正：McIntoshの下に「MH DESIGN WORKS」を追加 ---
-                // 位置：MC2500の下（logoY + 22 + 25 = logoY + 47）
-                ctx.fillStyle = "red"; // 赤色に設定
-                ctx.font = "bold 20px Arial"; // 少し小さめのArialフォント
-                ctx.fillText("MH DESIGN WORKS", w/2, logoY + 47); // 文字を追加（0310は無し）
+                ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
+                ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
             }
             draw();
         }

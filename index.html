@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Security Access</title>
+    <title>MH DESIGN WORKS - MC2500</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { background:#000; overflow:hidden; height:100vh; width:100vw; display:flex; justify-content:center; align-items:center; }
@@ -27,7 +27,7 @@
             background:rgba(0,0,0,0.95); z-index:100;
             display:none; justify-content:center; align-items:center; cursor:pointer;
         }
-        .btn-ui { padding:30px 60px; border:3px solid #0ff; border-radius:60px; font-size:28px; font-weight:bold; background:#001a1a; color:#0ff; }
+        .btn-ui { padding:20px 40px; border:2px solid #0ff; border-radius:40px; font-size:20px; font-weight:bold; background:#001a1a; color:#0ff; }
     </style>
 </head>
 <body>
@@ -77,17 +77,19 @@
                 const w = canvas.width, h = canvas.height;
                 ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
 
+                const isLandscape = w > h;
                 const groupW = w * 0.96;
                 const groupX = (w - groupW) / 2;
                 
-                // ★ 修正：枠の高さ(partH)を数値で大きく固定
-                const partH = 210; 
-                const eqGroupY = 10; 
-                const mtGroupY = eqGroupY + partH + 10; 
+                // ★ 横画面時の高さを最適化 (画面の高さの約32%)
+                const partH = h * 0.32; 
+                const eqGroupY = h * 0.05; 
+                const mtGroupY = eqGroupY + partH + (h * 0.03); 
 
                 const deckColor = "rgba(0, 255, 255, 0.7)";
-
-                ctx.strokeStyle = deckColor; ctx.lineWidth = 3;
+                ctx.strokeStyle = deckColor; ctx.lineWidth = isLandscape ? 2 : 3;
+                
+                // 外枠
                 ctx.strokeRect(groupX, eqGroupY, groupW, partH);
                 ctx.strokeRect(groupX, mtGroupY, groupW, partH);
 
@@ -96,64 +98,65 @@
 
                 centers.forEach((cx, idx) => {
                     const startX = cx - unitW / 2;
-                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = deckColor; ctx.lineWidth = 1;
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
                     // --- スペアナ ---
-                    const barCount = 16, numCells = 20, cellH = (partH - 10) / numCells;
+                    const barCount = 16, numCells = 15, cellH = (partH - 10) / numCells;
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i+2] || 0;
-                        let active = Math.floor((val / 255) * numCells * 0.9);
+                        let active = Math.floor((val / 255) * numCells);
                         for (let j = 0; j < numCells; j++) {
-                            let bx = startX + i * (unitW/barCount) + 2, by = eqGroupY + partH - (j + 1) * cellH - 5;
+                            let bx = startX + i * (unitW/barCount) + 1.5, by = eqGroupY + partH - (j + 1) * cellH - 5;
                             if (j < active) {
-                                ctx.fillStyle = j<4?"#0055ff":j<10?"#00ff00":j<15?"#ffff00":"#ff0000";
-                                ctx.fillRect(bx, by, (unitW/barCount)-4, cellH-2);
+                                ctx.fillStyle = j<4?"#0055ff":j<8?"#00ff00":j<12?"#ffff00":"#ff0000";
+                                ctx.fillRect(bx, by, (unitW/barCount)-3, cellH-1.5);
                             }
                         }
                     }
 
                     // --- レベルメーター ---
-                    const upY = mtGroupY + 65;
-                    const loY = mtGroupY + 110;
+                    const upY = mtGroupY + (partH * 0.3);
+                    const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
                     ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
 
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; ctx.font = "11px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 30 + k * (unitW-60)/3, upY - 10));
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 30 + k * (unitW-60)/5, loY + 18));
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; 
+                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 12));
 
-                    // ★ 文字の配置を枠の底辺に合わせる
+                    // ★ 文字の配置：枠の高さ(partH)に合わせて動的に位置を調整
                     ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
-                    ctx.font = "bold 18px Arial";
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH - 45); 
-                    ctx.font = "bold 13px Arial";
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH - 20);
+                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.82); 
+                    ctx.font = `bold ${isLandscape ? 10 : 13}px Arial`;
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.94);
 
                     // 針
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
-                    let ang = -0.35 + (mtSmooth[idx]/255) * 0.7;
+                    let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
                     angleSmooth[idx] += (ang - angleSmooth[idx]) * 0.15;
                     ctx.save();
                     ctx.beginPath(); ctx.rect(startX, mtGroupY, unitW, partH); ctx.clip();
-                    ctx.strokeStyle = "red"; ctx.lineWidth = 3;
-                    const pivotY = mtGroupY + partH + 120;
+                    ctx.strokeStyle = "red"; ctx.lineWidth = 2.5;
+                    const pivotY = mtGroupY + partH * 1.5;
                     ctx.beginPath(); ctx.moveTo(cx, pivotY);
-                    ctx.lineTo(cx + Math.sin(angleSmooth[idx])*550, pivotY - Math.cos(angleSmooth[idx])*550);
+                    ctx.lineTo(cx + Math.sin(angleSmooth[idx])*h, pivotY - Math.cos(angleSmooth[idx])*h);
                     ctx.stroke(); ctx.restore();
                 });
 
-                // ロゴ
-                const logoY = mtGroupY + partH + 45;
-                ctx.fillStyle = "#00ff00"; ctx.font = "bold 42px 'Times New Roman'"; ctx.textAlign = "center";
+                // ロゴ：高さを抑えて確実に表示
+                const logoY = mtGroupY + partH + (h * 0.08);
+                ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 28 : 38}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
-                ctx.fillStyle = "#fff"; ctx.font = "14px Arial"; 
-                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + 22);
-                ctx.fillStyle = "red"; ctx.font = "bold 18px Arial"; 
-                ctx.fillText("MH DESIGN WORKS", w/2, logoY + 44);
+                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 10 : 12}px Arial`; 
+                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 14 : 18));
+                ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 14 : 17}px Arial`; 
+                ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 30 : 38));
             }
             draw();
         }

@@ -87,7 +87,6 @@
                 const deckColor = "rgba(0, 255, 255, 0.7)";
                 ctx.strokeStyle = deckColor; ctx.lineWidth = isLandscape ? 2 : 3;
                 
-                // 外枠描画
                 ctx.strokeRect(groupX, eqGroupY, groupW, partH);
                 ctx.strokeRect(groupX, mtGroupY, groupW, partH);
 
@@ -100,8 +99,8 @@
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // --- 【復活】スペアナ：数値・横グリッド ---
-                    const labelArea = isLandscape ? 22 : 28;
+                    // --- スペアナ数値・縦横グリッド ---
+                    const labelArea = isLandscape ? 25 : 30; // 数字用の余白
                     const graphX = startX + labelArea;
                     const graphW = unitW - labelArea - 5;
                     
@@ -111,22 +110,19 @@
                     
                     levels.forEach((lv, i) => {
                         let ly = eqGroupY + (partH * (i / (levels.length - 1)));
-                        // 数値
                         ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
                         ctx.fillText(lv, graphX - 5, ly + 3);
-                        // 横線
-                        ctx.strokeStyle = "rgba(0, 255, 255, 0.2)";
+                        ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
-                    // --- 【復活】スペアナ：縦グリッド ---
                     const barCount = 16;
                     for(let i=0; i<=barCount; i++) {
                         let lx = graphX + (i * (graphW / barCount));
                         ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
                     }
 
-                    // バー描画
+                    // --- バー描画（3段ずつ色替え） ---
                     const numCells = 15, cellH = (partH - 4) / numCells;
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i+2] || 0;
@@ -134,13 +130,14 @@
                         for (let j = 0; j < numCells; j++) {
                             let bx = graphX + i * (graphW/barCount) + 1, by = eqGroupY + partH - (j + 1) * cellH - 2;
                             if (j < active) {
-                                ctx.fillStyle = j<4?"#0055ff":j<8?"#00ff00":j<12?"#ffff00":"#ff0000";
+                                // 下から3段(0,1,2):青, 3段(3,4,5):緑, 3段(6,7,8):黄, 3段(9,10,11):橙, 残り:赤
+                                ctx.fillStyle = j < 3 ? "#0055ff" : j < 6 ? "#00ff00" : j < 9 ? "#ffff00" : j < 12 ? "#ff8800" : "#ff0000";
                                 ctx.fillRect(bx, by, (graphW/barCount)-2, cellH-1.5);
                             }
                         }
                     }
 
-                    // --- 【復活】メーター：DECIBELS文字 ---
+                    // --- メーター目盛り ---
                     const upY = mtGroupY + (partH * 0.3);
                     const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
@@ -152,18 +149,18 @@
                     ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
                     ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 12));
 
-                    // DECIBELSを右下に配置
+                    // DECIBELS表示（被り回避のため右端に寄せて配置）
                     ctx.textAlign = "right"; ctx.font = "bold 9px Arial";
-                    ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + (partH * 0.68));
+                    ctx.fillText("DECIBELS", startX + unitW - 12, mtGroupY + (partH * 0.68));
 
-                    // LEFT/RIGHT表示
+                    // チャンネル名
                     ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
                     ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.82); 
                     ctx.font = `bold ${isLandscape ? 10 : 13}px Arial`;
                     ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.94);
 
-                    // 針の動き
+                    // 針
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -177,7 +174,7 @@
                     ctx.stroke(); ctx.restore();
                 });
 
-                // ロゴ周り
+                // ロゴ
                 const logoY = mtGroupY + partH + (h * 0.08);
                 ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 28 : 38}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);

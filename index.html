@@ -79,7 +79,6 @@
                 const isLandscape = w > h;
                 const groupW = w * 0.96;
                 const groupX = (w - groupW) / 2;
-                
                 const partH = h * 0.32; 
                 const eqGroupY = h * 0.05; 
                 const mtGroupY = eqGroupY + partH + (h * 0.03); 
@@ -87,6 +86,7 @@
                 const deckColor = "rgba(0, 255, 255, 0.7)";
                 ctx.strokeStyle = deckColor; ctx.lineWidth = isLandscape ? 2 : 3;
                 
+                // 外枠
                 ctx.strokeRect(groupX, eqGroupY, groupW, partH);
                 ctx.strokeRect(groupX, mtGroupY, groupW, partH);
 
@@ -99,68 +99,78 @@
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // --- スペアナ数値・縦横グリッド ---
-                    const labelArea = isLandscape ? 25 : 30; // 数字用の余白
-                    const graphX = startX + labelArea;
-                    const graphW = unitW - labelArea - 5;
+                    // --- スペアナ部：数値と縦線の描画 ---
+                    const labelW = isLandscape ? 25 : 30;
+                    const graphX = startX + labelW;
+                    const graphW = unitW - labelW - 5;
                     
-                    ctx.font = isLandscape ? "8px Arial" : "10px Arial";
+                    // 左側の数値 (+10 to -40)
+                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
                     const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
-                    
                     levels.forEach((lv, i) => {
-                        let ly = eqGroupY + (partH * (i / (levels.length - 1)));
-                        ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
-                        ctx.fillText(lv, graphX - 5, ly + 3);
+                        let ly = eqGroupY + (partH * (i / 5));
+                        ctx.fillText(lv, graphX - 5, ly + 4);
+                        // 横線（グリッド）
                         ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
                         ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
                     });
 
+                    // 縦線（グリッド）
                     const barCount = 16;
                     for(let i=0; i<=barCount; i++) {
                         let lx = graphX + (i * (graphW / barCount));
                         ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
                     }
 
-                    // --- バー描画（3段ずつ色替え） ---
-                    const numCells = 15, cellH = (partH - 4) / numCells;
+                    // --- グライコのバー（3段ずつ色分け） ---
+                    const numCells = 15;
+                    const cellH = (partH - 4) / numCells;
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i+2] || 0;
                         let active = Math.floor((val / 255) * numCells);
                         for (let j = 0; j < numCells; j++) {
-                            let bx = graphX + i * (graphW/barCount) + 1, by = eqGroupY + partH - (j + 1) * cellH - 2;
                             if (j < active) {
-                                // 下から3段(0,1,2):青, 3段(3,4,5):緑, 3段(6,7,8):黄, 3段(9,10,11):橙, 残り:赤
-                                ctx.fillStyle = j < 3 ? "#0055ff" : j < 6 ? "#00ff00" : j < 9 ? "#ffff00" : j < 12 ? "#ff8800" : "#ff0000";
+                                // 色のロジック修正：下から3段ずつ
+                                if (j < 3) ctx.fillStyle = "#0055ff";      // 青
+                                else if (j < 6) ctx.fillStyle = "#00ff00"; // 緑
+                                else if (j < 9) ctx.fillStyle = "#ffff00"; // 黄
+                                else if (j < 12) ctx.fillStyle = "#ff8800";// オレンジ
+                                else ctx.fillStyle = "#ff0000";            // 赤
+                                
+                                let bx = graphX + i * (graphW/barCount) + 1;
+                                let by = eqGroupY + partH - (j + 1) * cellH - 1;
                                 ctx.fillRect(bx, by, (graphW/barCount)-2, cellH-1.5);
                             }
                         }
                     }
 
-                    // --- メーター目盛り ---
+                    // --- 下段メーター部 ---
                     const upY = mtGroupY + (partH * 0.3);
                     const loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
                     ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
 
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; 
+                    // メーターの数字
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center";
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 12));
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
 
-                    // DECIBELS表示（被り回避のため右端に寄せて配置）
-                    ctx.textAlign = "right"; ctx.font = "bold 9px Arial";
-                    ctx.fillText("DECIBELS", startX + unitW - 12, mtGroupY + (partH * 0.68));
+                    // --- 【修正】DECIBELS表示：数字と被らない位置（中央下寄り） ---
+                    ctx.textAlign = "center"; 
+                    ctx.font = "bold 10px Arial";
+                    ctx.fillText("DECIBELS", cx, mtGroupY + (partH * 0.7));
 
                     // チャンネル名
-                    ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
                     ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
-                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.82); 
-                    ctx.font = `bold ${isLandscape ? 10 : 13}px Arial`;
-                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.94);
+                    ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.85); 
+                    ctx.font = `bold ${isLandscape ? 10 : 12}px Arial`;
+                    ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.95);
 
-                    // 針
+                    // 針の描画
                     let vMt = (data[idx===0?4:10] || 0);
                     mtSmooth[idx] += ((vMt * 2.5) - mtSmooth[idx]) * 0.1;
                     let ang = -0.32 + (mtSmooth[idx]/255) * 0.64;
@@ -174,14 +184,14 @@
                     ctx.stroke(); ctx.restore();
                 });
 
-                // ロゴ
+                // ロゴ部
                 const logoY = mtGroupY + partH + (h * 0.08);
-                ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 28 : 38}px 'Times New Roman'`; ctx.textAlign = "center";
+                ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 30 : 40}px 'Times New Roman'`; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
-                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 10 : 12}px Arial`; 
-                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 14 : 18));
-                ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 14 : 17}px Arial`; 
-                ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 30 : 38));
+                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 11 : 13}px Arial`; 
+                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 16 : 20));
+                ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
+                ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
             }
             draw();
         }

@@ -81,15 +81,14 @@
                 const groupW = w * 0.96;
                 const groupX = (w - groupW) / 2;
                 
-                // ★ 横画面時の高さを最適化 (画面の高さの約32%)
-                const partH = h * 0.32; 
-                const eqGroupY = h * 0.05; 
-                const mtGroupY = eqGroupY + partH + (h * 0.03); 
+                const partH = h * 0.33; 
+                const eqGroupY = h * 0.04; 
+                const mtGroupY = eqGroupY + partH + (h * 0.02); 
 
                 const deckColor = "rgba(0, 255, 255, 0.7)";
-                ctx.strokeStyle = deckColor; ctx.lineWidth = isLandscape ? 2 : 3;
                 
                 // 外枠
+                ctx.strokeStyle = deckColor; ctx.lineWidth = 2;
                 ctx.strokeRect(groupX, eqGroupY, groupW, partH);
                 ctx.strokeRect(groupX, mtGroupY, groupW, partH);
 
@@ -102,37 +101,62 @@
                     ctx.strokeRect(startX, eqGroupY, unitW, partH);
                     ctx.strokeRect(startX, mtGroupY, unitW, partH);
 
-                    // --- スペアナ ---
-                    const barCount = 16, numCells = 15, cellH = (partH - 10) / numCells;
+                    // --- スペアナ グリッド・数値 復活 ---
+                    const labelW = 25;
+                    const graphX = startX + labelW;
+                    const graphW = unitW - labelW - 5;
+                    
+                    ctx.strokeStyle = "rgba(0, 255, 255, 0.2)";
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
+                    ctx.font = "9px Arial";
+                    ctx.textAlign = "right";
+                    const levels = ["+10", "+5", "0", "-10", "-20", "-40"];
+                    levels.forEach((lv, i) => {
+                        let ly = eqGroupY + (partH * (i / (levels.length - 1)));
+                        ctx.fillText(lv, graphX - 5, ly + 3);
+                        ctx.beginPath(); ctx.moveTo(graphX, ly); ctx.lineTo(graphX + graphW, ly); ctx.stroke();
+                    });
+
+                    // スペアナ 縦線(グリッド)
+                    const barCount = 16;
+                    for(let i=0; i<=barCount; i++) {
+                        let lx = graphX + (i * (graphW / barCount));
+                        ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
+                    }
+
+                    // スペアナ本体
+                    const numCells = 20, cellH = partH / numCells;
                     for (let i = 0; i < barCount; i++) {
                         let val = data[i+2] || 0;
                         let active = Math.floor((val / 255) * numCells);
                         for (let j = 0; j < numCells; j++) {
-                            let bx = startX + i * (unitW/barCount) + 1.5, by = eqGroupY + partH - (j + 1) * cellH - 5;
+                            let bx = graphX + i * (graphW/barCount) + 1, by = eqGroupY + partH - (j + 1) * cellH;
                             if (j < active) {
-                                ctx.fillStyle = j<4?"#0055ff":j<8?"#00ff00":j<12?"#ffff00":"#ff0000";
-                                ctx.fillRect(bx, by, (unitW/barCount)-3, cellH-1.5);
+                                ctx.fillStyle = j<5?"#0055ff":j<10?"#00ff00":j<15?"#ffff00":"#ff0000";
+                                ctx.fillRect(bx, by+1, (graphW/barCount)-2, cellH-2);
                             }
                         }
                     }
 
-                    // --- レベルメーター ---
-                    const upY = mtGroupY + (partH * 0.3);
-                    const loY = mtGroupY + (partH * 0.55);
+                    // --- レベルメーター DECIBELS復活 ---
+                    const upY = mtGroupY + (partH * 0.35), loY = mtGroupY + (partH * 0.55);
                     ctx.strokeStyle = "rgba(0, 255, 255, 0.4)";
                     ctx.beginPath(); ctx.moveTo(startX + 10, upY); ctx.lineTo(startX + unitW - 10, upY); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(startX + 10, loY); ctx.lineTo(startX + unitW - 10, loY); ctx.stroke();
 
-                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; 
-                    ctx.font = isLandscape ? "9px Arial" : "11px Arial";
-                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
-                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 12));
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.9)"; ctx.textAlign = "center"; ctx.font = "9px Arial";
+                    ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 30 + k * (unitW-60)/3, upY - 8));
+                    ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 30 + k * (unitW-60)/5, loY + 12));
+                    
+                    // DECIBELS
+                    ctx.textAlign = "right"; ctx.font = "bold 9px Arial";
+                    ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + (partH * 0.68));
 
-                    // ★ 文字の配置：枠の高さ(partH)に合わせて動的に位置を調整
+                    // LEFT/RIGHT POWER OUTPUT
                     ctx.fillStyle = "#0ff"; ctx.textAlign = "center";
-                    ctx.font = `bold ${isLandscape ? 14 : 18}px Arial`;
+                    ctx.font = "bold 14px Arial";
                     ctx.fillText(idx===0?"LEFT":"RIGHT", cx, mtGroupY + partH * 0.82); 
-                    ctx.font = `bold ${isLandscape ? 10 : 13}px Arial`;
+                    ctx.font = "bold 10px Arial";
                     ctx.fillText("POWER OUTPUT", cx, mtGroupY + partH * 0.94);
 
                     // 針
@@ -143,20 +167,20 @@
                     ctx.save();
                     ctx.beginPath(); ctx.rect(startX, mtGroupY, unitW, partH); ctx.clip();
                     ctx.strokeStyle = "red"; ctx.lineWidth = 2.5;
-                    const pivotY = mtGroupY + partH * 1.5;
+                    const pivotY = mtGroupY + partH * 1.6;
                     ctx.beginPath(); ctx.moveTo(cx, pivotY);
                     ctx.lineTo(cx + Math.sin(angleSmooth[idx])*h, pivotY - Math.cos(angleSmooth[idx])*h);
                     ctx.stroke(); ctx.restore();
                 });
 
-                // ロゴ：高さを抑えて確実に表示
+                // ロゴ
                 const logoY = mtGroupY + partH + (h * 0.08);
-                ctx.fillStyle = "#00ff00"; ctx.font = `bold ${isLandscape ? 28 : 38}px 'Times New Roman'`; ctx.textAlign = "center";
+                ctx.fillStyle = "#00ff00"; ctx.font = "bold 28px 'Times New Roman'"; ctx.textAlign = "center";
                 ctx.fillText("McIntosh", w/2, logoY);
-                ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 10 : 12}px Arial`; 
-                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 14 : 18));
-                ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 14 : 17}px Arial`; 
-                ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 30 : 38));
+                ctx.fillStyle = "#fff"; ctx.font = "10px Arial"; 
+                ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + 14);
+                ctx.fillStyle = "red"; ctx.font = "bold 14px Arial"; 
+                ctx.fillText("MH DESIGN WORKS", w/2, logoY + 30);
             }
             draw();
         }

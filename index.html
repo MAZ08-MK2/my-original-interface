@@ -63,13 +63,16 @@
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.4; 
+            analyser.smoothingTimeConstant = 0.4; // 応答性を高める
             source.connect(analyser);
             const data = new Uint8Array(analyser.frequencyBinCount);
             document.getElementById('overlay').style.display = 'none';
 
             const barCount = 16;
+            // 物理演算用
             let peaks = [new Float32Array(barCount), new Float32Array(barCount)];
+            let vels = [new Float32Array(barCount), new Float32Array(barCount)];
+            const gravity = 0.05; // 重力加速度
 
             let angleSmooth = [0, 0];
             let mtSmooth = [0, 0];
@@ -105,6 +108,7 @@
                     const graphX = startX + labelW;
                     const graphW = unitW - labelW - 5;
                     
+                    // 背景グリッド描画
                     ctx.font = isLandscape ? "9px Arial" : "11px Arial";
                     ctx.textAlign = "right";
                     ctx.fillStyle = "rgba(0, 255, 255, 0.9)";
@@ -124,10 +128,20 @@
                         let rawVal = data[i + (idx === 0 ? 2 : 6)] || 0;
                         let targetVal = (rawVal / 255) * numCells;
                         
-                        // --- 常にカラーバーの先端に引っ付いて同時に落ちるロジック ---
-                        // 1. 上昇時：もちろん引っ付く
-                        // 2. 落下時：物理演算を使わず、現在のtargetValに直接追従させる
-                        peaks[idx][i] = targetVal; 
+                        // --- 改善されたピークホールド・ロジック ---
+                        if (targetVal > peaks[idx][i]) {
+                            peaks[idx][i] = targetVal;
+                            vels[idx][i] = 0; // 上昇時は速度を殺す
+                        } else {
+                            // 頂点に達した瞬間から即座に落下処理へ
+                            vels[idx][i] += gravity; 
+                            peaks[idx][i] -= vels[idx][i];
+                        }
+
+                        if (peaks[idx][i] < 0) {
+                            peaks[idx][i] = 0;
+                            vels[idx][i] = 0;
+                        }
 
                         let bx = graphX + i * (graphW / barCount) + 1;
                         
@@ -142,11 +156,10 @@
                             ctx.fillRect(bx, by, bw, cellH - 1.0);
                         }
 
-                        // ピークライン描画（常にカラーバーの最上部に描画）
-                        if (peaks[idx][i] > 0.5) {
+                        // ピークライン描画（常にEQより上にある場合のみ）
+                        if (peaks[idx][i] > targetVal + 0.2) {
                             ctx.fillStyle = "#ffffff";
-                            // Math.floorでバーの区切りに合わせることで、一体感を強調
-                            let pby = eqGroupY + partH - (Math.floor(peaks[idx][i]) * cellH) - 1.0;
+                            let pby = eqGroupY + partH - (peaks[idx][i] * cellH) - 1.0;
                             ctx.fillRect(bx, pby, bw, 2.0);
                         }
                     }

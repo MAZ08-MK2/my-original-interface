@@ -119,7 +119,7 @@
                         ctx.beginPath(); ctx.moveTo(lx, eqGroupY); ctx.lineTo(lx, eqGroupY + partH); ctx.stroke();
                     }
 
-                    // --- 【修正】グライコの段数を30（倍）にして高さを半分に ---
+                    // --- 【修正】グライコ：高さを低くしつつ、指定の段数で色分け ---
                     const numCells = 30;
                     const cellH = (partH - 4) / numCells;
                     for (let i = 0; i < barCount; i++) {
@@ -127,10 +127,10 @@
                         let active = Math.floor((val / 255) * numCells);
                         for (let j = 0; j < numCells; j++) {
                             if (j < active) {
-                                // 段数が倍になったので色分けの境界も倍に (6, 12, 18...)
-                                if (j < 6) ctx.fillStyle = "#00ff00";      
-                                else if (j < 12) ctx.fillStyle = "#ffff00"; 
-                                else if (j < 18) ctx.fillStyle = "#ff8800";
+                                // 指定色分け: 下から緑4, 黄4, 橙4, 残り赤
+                                if (j < 4) ctx.fillStyle = "#00ff00";      
+                                else if (j < 8) ctx.fillStyle = "#ffff00"; 
+                                else if (j < 12) ctx.fillStyle = "#ff8800";
                                 else ctx.fillStyle = "#ff0000";            
                                 
                                 let bx = graphX + i * (graphW/barCount) + 1;
@@ -152,10 +152,9 @@
                     ["1.2", "12", "120", "1.2k"].forEach((t, k) => ctx.fillText(t, startX + 25 + k * (unitW-50)/3, upY - 6));
                     ["-40", "-30", "-20", "-10", "0", "+10"].forEach((tx, k) => ctx.fillText(tx, startX + 25 + k * (unitW-50)/5, loY + 13));
 
-                    // --- 【修正】DECIBELS表示：確実に「右下」へ配置 ---
+                    // --- DECIBELS表示：右下へ配置 ---
                     ctx.textAlign = "right"; 
                     ctx.font = "bold 10px Arial";
-                    // 枠の右端(startX + unitW)から少し内側、かつパワー表示より上の位置
                     ctx.fillText("DECIBELS", startX + unitW - 10, mtGroupY + partH - 12);
 
                     ctx.textAlign = "center";

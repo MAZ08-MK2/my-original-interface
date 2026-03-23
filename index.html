@@ -199,7 +199,9 @@
                 ctx.fillStyle = "#fff"; ctx.font = `${isLandscape ? 11 : 13}px Arial`; 
                 ctx.fillText("MC2500 POWER AMPLIFIER", w/2, logoY + (isLandscape ? 16 : 20));
                 
-                // MH DESIGN WORKS の描画行を削除しました
+                // --- MH DESIGN WORKS のロゴを復活 ---
+                ctx.fillStyle = "red"; ctx.font = `bold ${isLandscape ? 15 : 18}px Arial`; 
+                ctx.fillText("MH DESIGN WORKS", w/2, logoY + (isLandscape ? 34 : 42));
             }
             draw();
         }
